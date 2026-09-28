@@ -23,8 +23,6 @@ const LD_W = Array.from({ length: K }, (_, k) => I(k + 1).map((v, c) => v - (k +
 const MAX_OCC = 8;
 
 const COMMON = /* glsl */`
-varying vec3 vOmRel;
-varying vec3 vOmUnit;
 uniform vec3 uSunRel;
 uniform float uSunR;
 uniform vec4 uOcc[${MAX_OCC}];      // occluder centre (km from this body) and equatorial radius
@@ -153,6 +151,9 @@ export function makeShadowUniforms() {
   };
 }
 
+// the point's position, passed from the vertex shader of a patched body material
+const VARYINGS = 'varying vec3 vOmRel;\nvarying vec3 vOmUnit;\n';
+
 /**
  * Patch a MeshStandardMaterial so its direct sunlight is computed by omSunlight().
  * opts.night: uniform { value: texture } of night-side lights (added where the Sun is below the horizon)
@@ -169,10 +170,10 @@ export function patchBodyMaterial(mat, u, opts = {}) {
     // So the point is lifted back onto the ellipsoid per fragment. The mesh is a unit sphere
     // stretched and turned by the model matrix M, which is linear, so M·(u/|u|) = (M·u)/|u| with u the
     // interpolated unit-sphere position: only |u| is needed.
-    sh.vertexShader = 'varying vec3 vOmRel;\nvarying vec3 vOmUnit;\nuniform float uPhysScale;\n' + sh.vertexShader.replace(
+    sh.vertexShader = VARYINGS + 'uniform float uPhysScale;\n' + sh.vertexShader.replace(
       '#include <begin_vertex>',
       '#include <begin_vertex>\n  vOmRel = mat3(modelMatrix) * transformed * uPhysScale;\n  vOmUnit = transformed;');
-    let frag = COMMON + 'uniform float uBlurU;\nuniform int uBlurN;\n';
+    let frag = VARYINGS + COMMON + 'uniform float uBlurU;\nuniform int uBlurN;\n';
     if (opts.night) frag += 'uniform sampler2D uNight;\nuniform float uNightOn;\n';
     let body = sh.fragmentShader;
     if (opts.blur) {
@@ -229,8 +230,8 @@ export function patchBodyMaterial(mat, u, opts = {}) {
       body = body.replace('#include <opaque_fragment>', /* glsl */`
 #ifdef USE_MAP
   {
-    vec3 up = normalize(vOmRel);
-    float sunAlt = dot(up, normalize(uSunRel - vOmRel));
+    vec3 up = normalize(omP);
+    float sunAlt = dot(up, normalize(uSunRel - omP));
     // lights fade in through civil twilight (sun 0°..-6° below the horizon)
     float night = 1.0 - smoothstep(-0.1, 0.0, sunAlt);
     // the Black Marble map also records moonlit land and sea; keep only the artificial lights
@@ -377,7 +378,6 @@ export function atmosphereMaterial(atmo, innerRatio, u) {
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.FrontSide,
     uniforms: {
       ...u,
-      uSunDir: { value: new THREE.Vector3(1, 0, 0) },
       uColor: { value: new THREE.Color(...atmo.color) },
       uTau: { value: new THREE.Vector3(...atmo.tauZenith) },
       uRin: { value: innerRatio },   // planet radius / shell radius
@@ -387,7 +387,7 @@ export function atmosphereMaterial(atmo, innerRatio, u) {
     vertexShader: /* glsl */`
       #include <common>
       #include <logdepthbuf_pars_vertex>
-      uniform vec3 uSunDir;
+      uniform vec3 uSunRel;
       uniform float uPhysScale;
       varying vec3 vPos; varying vec3 vCam; varying vec3 vSun;
       varying mat3 vToKm;
@@ -396,7 +396,7 @@ export function atmosphereMaterial(atmo, innerRatio, u) {
         vPos = position;
         vToKm = mat3(modelMatrix) * uPhysScale;   // shell frame → km from the centre, world axes
         vCam = (inverse(modelMatrix) * vec4(cameraPosition, 1.0)).xyz;
-        vSun = normalize(inverse(mat3(modelMatrix)) * uSunDir);
+        vSun = normalize(inverse(mat3(modelMatrix)) * uSunRel);
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         #include <logdepthbuf_vertex>
       }`,
@@ -426,7 +426,8 @@ export function atmosphereMaterial(atmo, innerRatio, u) {
         float cz = dot(normalize(mid), sun);
         float z = degrees(acos(clamp(cz, 0.0, 1.0)));
         float Xs = 1.0 / (max(cz, 0.0) + 0.50572 * pow(96.07995 - z, -1.6364));
-        vec3 light = exp(-uTau * (Xs - 1.0)) * smoothstep(-0.05, 0.02, cz) * omSunlight(vToKm * mid);
+        float day = smoothstep(-0.05, 0.02, cz);
+        vec3 light = day > 0.0 ? exp(-uTau * (Xs - 1.0)) * day * omSunlight(vToKm * mid) : vec3(0.0);
         float mu = dot(d, sun);                          // cosine of the scattering angle
         float phase = 0.75 * (1.0 + mu * mu);
         float scatter = 1.0 - exp(-uTau.b * max(X - X0, 0.0));

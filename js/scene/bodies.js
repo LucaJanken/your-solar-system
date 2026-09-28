@@ -261,7 +261,6 @@ export class BodyViews {
       u.uBlurN.value = turns < 0.01 ? 1 : Math.min(16, 2 + Math.ceil(turns * 48));
 
       const sunDist = Math.hypot(...me), sunDir = _sun.set(sun[0], sun[1], sun[2]).divideScalar(sunDist);
-      if (v.atmo) v.atmo.material.uniforms.uSunDir.value.copy(sunDir);
       if (v.rings) {
         const ru = v.rings.material.uniforms;
         ru.uSunDir.value.copy(sunDir); ru.uN.value.copy(_y);
