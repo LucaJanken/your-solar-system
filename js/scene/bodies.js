@@ -131,7 +131,7 @@ export class BodyViews {
       orient.add(v.clouds);
     }
     if (def.atmosphere) {
-      v.atmo = new THREE.Mesh(new THREE.SphereGeometry(1, ...seg), atmosphereMaterial({ ...def.atmosphere, radiusKm: def.shape[0] }, 1 / (1 + def.atmosphere.heightKm / def.shape[0])));
+      v.atmo = new THREE.Mesh(new THREE.SphereGeometry(1, ...seg), atmosphereMaterial({ ...def.atmosphere, radiusKm: def.shape[0] }, 1 / (1 + def.atmosphere.heightKm / def.shape[0]), u));
       orient.add(v.atmo);
     }
     if (def.rings) {

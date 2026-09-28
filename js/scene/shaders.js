@@ -24,6 +24,7 @@ const MAX_OCC = 8;
 
 const COMMON = /* glsl */`
 varying vec3 vOmRel;
+varying vec3 vOmUnit;
 uniform vec3 uSunRel;
 uniform float uSunR;
 uniform vec4 uOcc[${MAX_OCC}];      // occluder centre (km from this body) and equatorial radius
@@ -40,14 +41,17 @@ uniform sampler2D uRingTex;
 
 // How dark a partial shadow is drawn. Photometrically the light left is 1 − cov (cov: the fraction
 // of the Sun's light hidden), but on a screen, after the sRGB encoding, a surface at half light still
-// looks almost fully lit. For a small body's shadow on a large one, the Moon's on Earth, the
-// penumbra, thousands of km across, then fades into the day side and leaves only the umbra, ~100 km,
-// as a black dot. On such bodies (uShadowLift = 1) it is the displayed brightness that falls as
-// 1 − cov, an even darkening from the penumbra's edge to the umbra, as a camera exposed for the day
-// side and viewed on a screen shows it; in linear light that is (1 − cov)^2.2. A large body's shadow
-// on a small one (Earth's on the Moon) needs no help and stays photometric, which keeps the umbra's
-// edge crisp. Where a shadow begins (cov = 0) and the umbra (cov = 1) are the same either way, so
-// eclipse geometry and timing are not affected.
+// looks almost fully lit, so the Moon's penumbra on Earth, thousands of km across, is only a faint
+// smudge around the umbra (~100 km). On such bodies, a small body's shadow on a large one
+// (uShadowLift = 1), the light left is drawn as (1 − cov)^SHADOW_LIFT instead, a displayed brightness
+// of about (1 − cov)^0.55 rather than (1 − cov)^0.45: the penumbra reads from a distance, while the
+// deep penumbra (cov ≈ 0.9) stays visibly lighter than the umbra, so the track of totality stands out
+// as a dark core, as in DSCOVR's images of the 2017 and 2024 eclipses. (Drawing the displayed
+// brightness as 1 − cov turned everything past cov ≈ 0.8, some 1,500 km, black and hid the umbra.)
+// A large body's shadow on a small one (Earth's on the Moon) needs no help and stays photometric.
+// Where a shadow begins (cov = 0) and the umbra (cov = 1) are the same either way, so eclipse
+// geometry and timing are not affected.
+const float SHADOW_LIFT = 1.2;
 const vec3 OM_W[${K}] = vec3[${K}](${LD_W.map(w => `vec3(${w.map(x => x.toFixed(8)).join(', ')})`).join(', ')});
 
 // overlap area of two discs of radii R, r at centre distance d (flat-sky, angles in radians)
@@ -103,7 +107,7 @@ vec3 omSunlight(vec3 p) {
     float sep = atan(length(cross(nSi, nO)), dot(nSi, nO));
     if (sep >= aS + aO) continue;
     vec3 lit = max(1.0 - omCover(aS, aO, sep), 0.0);
-    lit = mix(lit, pow(lit, vec3(2.2)), uShadowLift);
+    lit = mix(lit, pow(lit, vec3(SHADOW_LIFT)), uShadowLift);
     // inside Earth's umbra the Moon is lit only by sunlight refracted through Earth's atmosphere,
     // which is reddened by Rayleigh scattering: the copper "blood moon"
     vec3 through = atmo ? uAtmoLight : vec3(0.0);
@@ -160,9 +164,14 @@ export function patchBodyMaterial(mat, u, opts = {}) {
   mat.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, u);
     if (opts.night) { sh.uniforms.uNight = opts.night; sh.uniforms.uNightOn = opts.nightOn; }
-    sh.vertexShader = 'varying vec3 vOmRel;\nuniform float uPhysScale;\n' + sh.vertexShader.replace(
+    // The mesh's flat facets lie up to 5 km (Earth, 96 × 64 segments) inside the true surface, and
+    // at a low Sun that moves a shadow computed there sideways by 5 km · cot(altitude): 30 km at 10°.
+    // So the point is lifted back onto the ellipsoid per fragment. The mesh is a unit sphere
+    // stretched and turned by the model matrix M, which is linear, so M·(u/|u|) = (M·u)/|u| with u the
+    // interpolated unit-sphere position: only |u| is needed.
+    sh.vertexShader = 'varying vec3 vOmRel;\nvarying vec3 vOmUnit;\nuniform float uPhysScale;\n' + sh.vertexShader.replace(
       '#include <begin_vertex>',
-      '#include <begin_vertex>\n  vOmRel = mat3(modelMatrix) * transformed * uPhysScale;');
+      '#include <begin_vertex>\n  vOmRel = mat3(modelMatrix) * transformed * uPhysScale;\n  vOmUnit = transformed;');
     let frag = COMMON + 'uniform float uBlurU;\nuniform int uBlurN;\n';
     if (opts.night) frag += 'uniform sampler2D uNight;\nuniform float uNightOn;\n';
     let body = sh.fragmentShader;
@@ -192,7 +201,7 @@ export function patchBodyMaterial(mat, u, opts = {}) {
     // the incidence and emission angles, α: phase angle.
     const lunar = !opts.lunar ? '' : /* glsl */`
   {
-    vec3 sunV = normalize((viewMatrix * vec4(normalize(uSunRel - vOmRel), 0.0)).xyz);
+    vec3 sunV = normalize((viewMatrix * vec4(normalize(uSunRel - omP), 0.0)).xyz);
     float mu0 = max(dot(normal, sunV), 0.0), mu = max(dot(normal, geometryViewDir), 0.0);
     float a = degrees(acos(clamp(dot(sunV, geometryViewDir), -1.0, 1.0)));
     float L = clamp(1.0 + a * (-0.019 + a * (2.42e-4 - 1.46e-6 * a)), 0.0, 1.0);
@@ -205,13 +214,14 @@ export function patchBodyMaterial(mat, u, opts = {}) {
     // ground as seen through one air mass.
     const ext = !opts.extinction ? '' : /* glsl */`
   {
-    float cz = dot(normalize(vOmRel), normalize(uSunRel - vOmRel));
+    float cz = dot(normalize(omP), normalize(uSunRel - omP));
     float z = degrees(acos(clamp(cz, 0.0, 1.0)));
     float X = 1.0 / (max(cz, 0.0) + 0.50572 * pow(96.07995 - z, -1.6364));
     omLight *= exp(-vec3(${opts.extinction.map(x => x.toFixed(3)).join(', ')}) * (X - 1.0));
   }`;
     body = body.replace('#include <lights_fragment_end>', /* glsl */`#include <lights_fragment_end>
-  vec3 omLight = omSunlight(vOmRel);${ext}
+  vec3 omP = vOmRel / length(vOmUnit);   // on the true surface (see the vertex shader)
+  vec3 omLight = omSunlight(omP);${ext}
   reflectedLight.directDiffuse *= omLight;
   reflectedLight.directSpecular *= omLight;${lunar}`);
     if (opts.night) {
@@ -359,10 +369,14 @@ export function ringMaterial(tex, planetShadow) {
 
 export const SUN_INTENSITY = 3.4;   // the scene's sunlight (irradiance at normal incidence)
 
-export function atmosphereMaterial(atmo, innerRatio) {
+// Eclipse shadows darken the air as they darken the ground (u: the planet's shadow uniforms, shared):
+// without that, the glow, added on top, washes a solar eclipse out wherever the view crosses a
+// long path through the air, toward the limb.
+export function atmosphereMaterial(atmo, innerRatio, u) {
   return new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.FrontSide,
     uniforms: {
+      ...u,
       uSunDir: { value: new THREE.Vector3(1, 0, 0) },
       uColor: { value: new THREE.Color(...atmo.color) },
       uTau: { value: new THREE.Vector3(...atmo.tauZenith) },
@@ -374,10 +388,13 @@ export function atmosphereMaterial(atmo, innerRatio) {
       #include <common>
       #include <logdepthbuf_pars_vertex>
       uniform vec3 uSunDir;
+      uniform float uPhysScale;
       varying vec3 vPos; varying vec3 vCam; varying vec3 vSun;
+      varying mat3 vToKm;
       void main() {
         // work in the shell's own frame, where it is the unit sphere
         vPos = position;
+        vToKm = mat3(modelMatrix) * uPhysScale;   // shell frame → km from the centre, world axes
         vCam = (inverse(modelMatrix) * vec4(cameraPosition, 1.0)).xyz;
         vSun = normalize(inverse(mat3(modelMatrix)) * uSunDir);
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
@@ -386,8 +403,10 @@ export function atmosphereMaterial(atmo, innerRatio) {
     fragmentShader: /* glsl */`
       #include <common>
       #include <logdepthbuf_pars_fragment>
+      ${COMMON}
       uniform vec3 uColor; uniform vec3 uTau; uniform float uRin; uniform float uHs; uniform float uXlimb;
       varying vec3 vPos; varying vec3 vCam; varying vec3 vSun;
+      varying mat3 vToKm;
       void main() {
         #include <logdepthbuf_fragment>
         vec3 d = normalize(vPos - vCam), sun = normalize(vSun);
@@ -407,7 +426,7 @@ export function atmosphereMaterial(atmo, innerRatio) {
         float cz = dot(normalize(mid), sun);
         float z = degrees(acos(clamp(cz, 0.0, 1.0)));
         float Xs = 1.0 / (max(cz, 0.0) + 0.50572 * pow(96.07995 - z, -1.6364));
-        vec3 light = exp(-uTau * (Xs - 1.0)) * smoothstep(-0.05, 0.02, cz);
+        vec3 light = exp(-uTau * (Xs - 1.0)) * smoothstep(-0.05, 0.02, cz) * omSunlight(vToKm * mid);
         float mu = dot(d, sun);                          // cosine of the scattering angle
         float phase = 0.75 * (1.0 + mu * mu);
         float scatter = 1.0 - exp(-uTau.b * max(X - X0, 0.0));
