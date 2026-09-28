@@ -1,4 +1,4 @@
-// Node runner:  node solar-system/tests/run.mjs   (Node 18+, no dependencies)
+// Node runner:  node tests/run.mjs   (Node 20.19+ or 22.7+, no dependencies)
 import { readFileSync } from 'node:fs';
 import { runAll } from './checks.js';
 

@@ -9,7 +9,7 @@
 //   planets, Pluto      astronomy-engine: VSOP87 (truncated) and a numerically integrated Pluto
 //   Moon                astronomy-engine: Brown's theory (Improved Lunar Ephemeris, 1954), via Montenbruck & Pfleger
 //   Galilean moons      astronomy-engine: Lainey's L1.2 theory
-//   Titan, Triton, Charon, Phobos, Deimos  fits to JPL Horizons (see satellites.js)
+//   Saturn's moons, Triton, Charon, Phobos, Deimos  fits to JPL Horizons (see satellites.js)
 //   spin axes           IAU WGCCRE 2015: astronomy-engine RotationAxis for the Sun, Moon and planets,
 //                       NAIF pck00011 for the other moons (rotation.js); Earth: precession, nutation, GAST
 //   time scales         UT → TT via ΔT: USNO/IERS measurements and predictions 1657–2033 (deltat.js),
@@ -19,9 +19,9 @@
 
 import * as A from '../../vendor/astronomy.min.js';
 import { BODIES, BY_NAME } from '../data/bodies.js';
-import { satelliteState, FITTED } from './satellites.js';
+import { satelliteState, lockedSpin, FITTED } from './satellites.js';
 import { deltaT } from './deltat.js';
-import { iauRotation } from './rotation.js';
+import { iauRotation, FOLLOW_ORBIT, MODELS } from './rotation.js';
 
 A.SetDeltaTFunction(deltaT);
 
@@ -122,7 +122,9 @@ export function snapshot(when) {
       continue;
     }
     const rot = iauRotation(b.name, time.tt);
-    if (rot) { axes[b.name] = iauAxes(rot.pole, rot.W); continue; }
+    // Saturn's inner moons stay locked to Saturn, at its mean motion and through their resonances'
+    // slow swings in longitude
+    if (rot) { axes[b.name] = iauAxes(rot.pole, rot.W + (FOLLOW_ORBIT.includes(b.name) ? lockedSpin(b.name, time.tt, MODELS[b.name].pm[1]) : 0)); continue; }
     // fallback for a moon without an IAU model: pole along the orbit normal, prime meridian
     // facing the planet (no libration)
     const { pos, vel } = bodies[b.name].rel;

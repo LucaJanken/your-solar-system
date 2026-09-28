@@ -1,12 +1,17 @@
 // The Sun's glare: what an eye or a camera exposed for the planets does with a source ~10¹⁰ times
 // brighter. Drawn in screen space over the finished picture, and sized in pixels relative to the
 // Sun's drawn disc:
-//   bloom  a rim of light hugging the limb, a few percent of the disc radius wide, at every size;
-//   halo   a soft glow and a wide faint veil, with four faint diffraction spikes, while the disc is
-//          small on screen. It fades out as the disc grows, so a close or telescope view (the Sun
-//          seen through a filter) keeps its limb darkening and the planets crossing it.
-// It lights only empty sky (the quad sits at the far plane and is depth tested), never the disc or a
-// body in front of it, and the whole glare scales with the fraction of the disc not hidden by one.
+//   bloom   a rim of light hugging the limb, a few percent of the disc radius wide, at every size;
+//   halo    a soft glow and a wide faint veil while the disc is small on screen. It fades out as the
+//           disc grows, so a close or telescope view (the Sun seen through a filter) keeps its limb
+//           darkening and the planets crossing it;
+//   corona  fine radial streaks through the halo, like the "ciliary corona" of an eye, whose light
+//           is scattered by fibres and particles in the lens and so changes with every movement of
+//           the eye: each streak brightens and fades as the view turns.
+// There are no diffraction spikes or lens ghosts: both are fixed to the camera, so they looked like
+// a sticker following the Sun around. The glare lights only empty sky (its quad sits at the far plane
+// and is depth tested), never the disc or a body in front of it, and scales with the fraction of the
+// disc not hidden by one.
 
 // Add colour but leave alpha alone: the canvas is transparent over the page's sky gradient, and
 // writing alpha would paint that sky black wherever something is added.
@@ -27,12 +32,20 @@ export class SunGlare {
       uPx: { value: 1 },                      // device pixel ratio
       uHalo: { value: 1 },                    // 0..1: how much of the wide glare to show
       uVis: { value: 1 },                     // visible fraction of the disc
+      uPhase: { value: new THREE.Vector2() }, // the view direction, which sets the corona's streaks
     };
     const mat = new THREE.ShaderMaterial({
       uniforms: this.uniforms, transparent: true, depthTest: true, depthWrite: false, ...ADD_KEEP_ALPHA,
       vertexShader: /* glsl */`void main() { gl_Position = vec4(position.xy, 1.0, 1.0); }`,
       fragmentShader: /* glsl */`
-        uniform vec2 uSun; uniform float uR; uniform float uPx; uniform float uHalo; uniform float uVis;
+        uniform vec2 uSun; uniform float uR; uniform float uPx; uniform float uHalo; uniform float uVis; uniform vec2 uPhase;
+        // value noise, periodic in x with period n (so the streaks close up all the way round)
+        float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float noiseP(vec2 p, float n) {
+          vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+          float x0 = mod(i.x, n), x1 = mod(i.x + 1.0, n);
+          return mix(mix(hash(vec2(x0, i.y)), hash(vec2(x1, i.y)), f.x), mix(hash(vec2(x0, i.y + 1.0)), hash(vec2(x1, i.y + 1.0)), f.x), f.y);
+        }
         void main() {
           vec2 q = (gl_FragCoord.xy - uSun) / uPx;
           // Full strength right up to the limb: the depth test already confines the glare to sky,
@@ -45,9 +58,11 @@ export class SunGlare {
           // stay below it, or it reads as a white outline
           float bloom = (0.12 + 0.33 * uHalo) * exp(-x / (2.0 + 0.05 * uR));
           float halo = 0.25 * exp(-x / (8.0 + 0.8 * uR)) + 0.05 / (1.0 + pow(x / (40.0 + 2.0 * uR), 2.0));
-          float a = atan(q.y, q.x) + 0.35;
-          float spikes = 0.10 * pow(abs(cos(2.0 * a)), 600.0) * exp(-x / (40.0 + 3.0 * uR));
-          float I = (bloom + uHalo * (halo + spikes)) * uVis;
+          // two octaves of streaks around the disc; their brightness varies with uPhase
+          float u = atan(q.y, q.x) / 6.2831853 + 0.5;
+          float st = 0.65 * pow(noiseP(vec2(u * 72.0, uPhase.x), 72.0), 3.0) + 0.35 * pow(noiseP(vec2(u * 167.0, uPhase.y), 167.0), 2.0);
+          float corona = 0.16 * st * exp(-x / (22.0 + 1.2 * uR)) * min(x / 3.0, 1.0);
+          float I = (bloom + uHalo * (halo + corona)) * uVis;
           gl_FragColor = vec4(vec3(1.0, 0.96, 0.88) * I, 1.0);
         }`,
     });
@@ -79,6 +94,11 @@ export class SunGlare {
     const u = this.uniforms;
     u.uSun.value.set(x * pixelRatio, y * pixelRatio);
     u.uR.value = rpx; u.uPx.value = pixelRatio; u.uHalo.value = this.halo; u.uVis.value = this.vis;
+    // The corona's pattern follows the direction the camera looks in, so it shimmers as the view
+    // turns, also while orbiting the Sun with it held in the centre (an eye's pattern changes with
+    // every movement of the eye). 5 noise cells per radian: turning 10° renews about one streak in ten.
+    camera.getWorldDirection(_c);
+    u.uPhase.value.set(5 * (_c.x + 0.6 * _c.y - 0.3 * _c.z), 5 * (_c.z + 0.6 * _c.x - 0.4 * _c.y));
   }
 
   render(renderer) { if (this.on) renderer.render(this.scene, this.camera); }
@@ -86,6 +106,7 @@ export class SunGlare {
 
 // fraction of the Sun's disc not hidden by the drawn spheres, sampled at the centre and two rings
 const _v = new THREE.Vector3(), _s = new THREE.Vector3(), _u = new THREE.Vector3(), _w = new THREE.Vector3(), _ray = new THREE.Vector3(), _oc = new THREE.Vector3(), _t = new THREE.Vector3();
+const _c = new THREE.Vector3();
 function visibleFraction(camera, sunPos, R, occluders) {
   const cam = camera.position;
   _ray.subVectors(sunPos, cam).normalize();

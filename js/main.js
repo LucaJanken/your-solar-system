@@ -821,11 +821,12 @@ function wire() {
   });
   window.addEventListener('pointerdown', e => { if (whenOpen && !e.target.closest('#whenForm, #whenBtn')) setWhenOpen(false); }, true);
   $('timeMode').addEventListener('click', () => setTimeMode(TIME_MODES[(TIME_MODES.indexOf(timeMode) + 1) % TIME_MODES.length]));
-  $('badge').addEventListener('click', () => { openSheet('guide'); $('guide').querySelector('table').scrollIntoView({ block: 'center' }); });
+  $('badge').addEventListener('click', () => { openSheet('guide'); $('guideAccuracy').open = true; $('guideAccuracy').scrollIntoView({ block: 'start' }); });
   $('eventsBtn').addEventListener('click', openEvents);
   $('evList').addEventListener('scroll', queueEvFill, { passive: true });
   for (const b of document.querySelectorAll('[data-evkind]')) b.addEventListener('click', () => setEvKind(b.dataset.evkind));
   $('guideBtn').addEventListener('click', () => openSheet('guide'));
+  $('supportBtn').addEventListener('click', () => openSheet('support'));
   $('shareBtn').addEventListener('click', async () => {
     const url = shareUrl();
     history.replaceState(null, '', url);

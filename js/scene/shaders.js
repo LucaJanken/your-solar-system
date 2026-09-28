@@ -19,12 +19,15 @@ const K = 6;
 const I = k => { const r = (k - 0.5) / K, mu = Math.sqrt(1 - r * r); return X_RGB.map(x => limb(mu, x)); };
 const LD_W = Array.from({ length: K }, (_, k) => I(k + 1).map((v, c) => v - (k + 1 < K ? I(k + 2)[c] : 0)));
 
+// most bodies that can shadow one body (Saturn: its seven moons)
+const MAX_OCC = 8;
+
 const COMMON = /* glsl */`
 varying vec3 vOmRel;
 uniform vec3 uSunRel;
 uniform float uSunR;
-uniform vec4 uOcc[4];      // occluder centre (km from this body) and equatorial radius
-uniform vec4 uOccPole[4];  // occluder pole (unit) and equatorial / polar radius
+uniform vec4 uOcc[${MAX_OCC}];      // occluder centre (km from this body) and equatorial radius
+uniform vec4 uOccPole[${MAX_OCC}];  // occluder pole (unit) and equatorial / polar radius
 uniform int uOccN;
 uniform int uAtmoIdx;
 uniform vec3 uAtmoLight;
@@ -81,7 +84,7 @@ vec3 omSunlight(vec3 p) {
   float dS = length(toSun);
   vec3 nS = toSun / dS;
   vec3 light = vec3(1.0);
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < ${MAX_OCC}; i++) {
     if (i >= uOccN) break;
     vec3 toO = omStretch(uOcc[i].xyz - p, uOccPole[i]);
     vec3 toS = omStretch(toSun, uOccPole[i]);
@@ -129,8 +132,8 @@ export function makeShadowUniforms() {
   return {
     uSunRel: { value: new THREE.Vector3() },
     uSunR: { value: 695700 },
-    uOcc: { value: [0, 1, 2, 3].map(() => new THREE.Vector4()) },
-    uOccPole: { value: [0, 1, 2, 3].map(() => new THREE.Vector4(0, 1, 0, 1)) },
+    uOcc: { value: Array.from({ length: MAX_OCC }, () => new THREE.Vector4()) },
+    uOccPole: { value: Array.from({ length: MAX_OCC }, () => new THREE.Vector4(0, 1, 0, 1)) },
     uOccN: { value: 0 },
     uAtmoIdx: { value: -1 },
     uAtmoLight: { value: new THREE.Color(0.11, 0.030, 0.009) },

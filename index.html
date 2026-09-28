@@ -60,6 +60,7 @@
       <button type="button" class="act wide" id="eventsBtn">Eclipses &amp; transits ▸</button>
       <button type="button" class="act" id="guideBtn">Guide</button>
       <button type="button" class="act" id="shareBtn">Share view</button>
+      <button type="button" class="support-btn wide" id="supportBtn" aria-haspopup="dialog">♥ Support</button>
     </section>
   </div>
 
@@ -125,55 +126,109 @@
   <div class="sheet" id="guide" hidden role="dialog" aria-labelledby="guideTitle">
     <button type="button" class="close" data-close>Close</button>
     <h2 id="guideTitle">Guide</h2>
-    <p>Everything you see is computed for the displayed instant: where each body is, which way it faces, where its shadow falls and which stars are behind it. Nothing is animated along a canned path.</p>
+    <p class="lead">Everything you see is computed for the instant on the clock: where each body is, which way it faces, where its shadow falls and which stars lie behind it.</p>
 
     <h3>Getting around</h3>
-    <ul>
-      <li>Drag (one finger on a touchscreen) to turn the view around the selected body, scroll or pinch to zoom. With <b>Lock</b> off, right-drag, shift-drag, the arrow keys or a two-finger drag move the view sideways; while locked the view stays on the body, so a pinch only zooms.</li>
-      <li>Click a body, its label, or its name in the list to fly to it (the count next to a planet opens the list of its moons). The camera glides over without changing your zoom or viewing angle (it only backs off if it would end up inside the body). Choose it again to fly in to a comfortable view of it, turned toward its sunlit side if you were looking at its night side, and a third time to fly back out. <b>Lock</b> keeps the camera travelling with the selected body; unlock it to let the body drift away, and lock again to catch up with it.</li>
-      <li>The speed slider runs time forward to the right and backward to the left, from real time next to the middle to years per second at the ends; the notch in the middle stops it. <b>Play</b> and <b>Pause</b> keep the chosen speed. The arrows beside them step time back or forward by an hour, a day, a month or a year: tap the step between them to change it. Days, months and years keep the time of day, so Earth turns the same face to the Sun. In the middle notch the speed reads 0×; paused with the button, it shows (dimmed) the speed Play resumes at.</li>
-      <li>The calendar button goes to a date, in the time the clock shows (local or UTC). On a phone it opens the phone’s own date picker, and confirming there goes to the date; on a computer type or pick a date and press <b>Go</b> (or <kbd>Enter</kbd>), or <kbd>Esc</kbd> to leave it.</li>
-      <li>The button above the clock switches it between <b>Local</b> time, <b>UTC</b>, and <b>Scientific</b>, which adds the astronomical time scales: UT (Earth’s rotation, UT1), TT (the uniform time the planets move by), ΔT = TT − UT and the Julian Date. The model takes UTC to be UT1; the two never differ by more than 0.9 s.</li>
-      <li><kbd>Space</kbd> play/pause · <kbd>,</kbd> <kbd>.</kbd> one step back/forward · <kbd>[</kbd> <kbd>]</kbd> (or <b>−</b> <b>+</b>) the speed slider one step left/right · <kbd>R</kbd> reverse the direction of time · <kbd>N</kbd> now · <kbd>T</kbd> scale · <kbd>Esc</kbd> back to the overview.</li>
-      <li>The information panel starts folded down to the selected body’s name: tap it (or <b>+</b>) to open it, and <b>–</b> folds it again. On a phone, tap an open panel to show all of its data.</li>
+    <ul class="basics">
+      <li><b>Look around.</b> Drag to turn the view; scroll or pinch to zoom.</li>
+      <li><b>Visit a body.</b> Click it, its label or its name in the list, and the camera glides over. Choose it again to fly in close, and a third time to fly back out. The number beside a planet lists its moons.</li>
+      <li><b>Run time.</b> The speed slider runs time forward to the right and backward to the left, faster toward the ends. The notch in the middle stops it.</li>
+      <li><b>Jump in time.</b> ◂ and ▸ step by an hour, a day, a month or a year (tap the step between them to change it). The calendar button goes to any date from 1000 to 2999, and <b>Now</b> comes back to the present.</li>
+      <li><b>Eclipses &amp; transits</b> lists past and coming events. Choose one to watch it.</li>
+      <li><b>Share view</b> copies a link to exactly what you see.</li>
     </ul>
+    <dl class="keys">
+      <dt><kbd>Space</kbd></dt><dd>play / pause</dd>
+      <dt><kbd>,</kbd> <kbd>.</kbd></dt><dd>one step back / forward</dd>
+      <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>slower / faster (the speed slider one step)</dd>
+      <dt><kbd>R</kbd></dt><dd>reverse time</dd>
+      <dt><kbd>N</kbd></dt><dd>now</dd>
+      <dt><kbd>T</kbd></dt><dd>overview ↔ true scale</dd>
+      <dt><kbd>Esc</kbd></dt><dd>back to the overview</dd>
+    </dl>
 
-    <h3>Scale</h3>
-    <p>At <b>true scale</b> the Solar System is almost entirely empty: if the Sun were a grapefruit, Earth would be a grain of sand 13 m away and Neptune 390 m away. The <b>overview</b> shrinks distances and enlarges bodies so everything fits on one screen, and the slider morphs smoothly between the two. Directions are never distorted, so alignments such as eclipses and conjunctions look right at every setting. Bodies too small to see are marked by their labels; hovering over one circles it.</p>
+    <p class="more-hint">More, for the curious:</p>
+    <details>
+      <summary>More about the controls</summary>
+      <ul>
+        <li>The camera glides to a body without changing your zoom or viewing angle (it only backs off if it would end up inside the body). Flying in close turns it toward the sunlit side if you were looking at the night side.</li>
+        <li><b>Lock</b> keeps the camera travelling with the selected body. Unlock it to let the body drift away, and lock again to catch up with it. With <b>Lock</b> off, right-drag, shift-drag, the arrow keys or a two-finger drag move the view sideways.</li>
+        <li>The speed slider runs from real time next to the middle to years per second at the ends. <b>Play</b> and <b>Pause</b> keep the chosen speed: paused, the speed is shown dimmed; in the middle notch it reads 0×. <b>−</b> and <b>+</b> move the slider one step.</li>
+        <li>Stepping by days, months or years keeps the time of day, so Earth turns the same face to the Sun.</li>
+        <li>The calendar takes dates in the time the clock shows (local or UTC). On a phone it opens the phone’s own date picker; on a computer type or pick a date and press <b>Go</b> (or <kbd>Enter</kbd>).</li>
+        <li>The button above the clock switches between <b>Local</b> time, <b>UTC</b> and <b>Scientific</b>, which adds the astronomical time scales: UT (Earth’s rotation, UT1), TT (the uniform time the planets move by), ΔT = TT − UT and the Julian Date. The model takes UTC to be UT1; the two never differ by more than 0.9 s.</li>
+        <li>The information panel starts folded down to the body’s name: tap it (or <b>+</b>) to open it, and <b>–</b> folds it again. On a phone, tap an open panel to show all of its data.</li>
+      </ul>
+    </details>
 
-    <h3>Shadows and eclipses</h3>
-    <p>Shadows are computed for every point on a surface from the true sizes and distances of the Sun and of the body in the way, including the Sun’s limb darkening (the light left in a deep partial shadow comes from the Sun’s redder edge, which tints it brown) and the light’s travel time (the sunlight hitting Earth passed the Moon 1.3 s earlier, which moves a solar eclipse 35 km along its track). They are therefore correct at every scale setting, even when the Moon is drawn closer than it really is. During a lunar eclipse the Moon turns copper-red, because the only light reaching it has been bent and reddened by Earth’s atmosphere. Saturn’s rings cast shadows on the planet and Saturn casts one on its rings. Jupiter’s moons cast theirs on Jupiter and disappear into its shadow, whose flattened shape is taken into account (it lengthens Io’s eclipses by three minutes). Pluto and Charon eclipse each other only in two seasons of each 248-year orbit, the last in 1985–1990.</p>
-    <p>One liberty: where a moon’s shadow falls on its planet, the partial shadow is drawn darker than a light meter would record, because on a screen a surface at half light looks almost fully lit, and the Moon’s partial shadow, thousands of km across, would shrink to a dark dot. Where every shadow begins and ends, and the full shadow itself, are exact. Earth’s shadow on the Moon needs no such help and is drawn as measured.</p>
+    <details>
+      <summary>Overview and true scale</summary>
+      <p>At <b>true scale</b> the Solar System is almost entirely empty: if the Sun were a grapefruit, Earth would be a grain of sand 13 m away and Neptune 390 m away. The <b>overview</b> shrinks distances and enlarges bodies so everything fits on one screen, and the slider morphs smoothly between the two. Directions are never distorted, so alignments such as eclipses and conjunctions look right at every setting. Bodies too small to see are marked by their labels; hovering over one circles it.</p>
+    </details>
 
-    <h3>How accurate is it?</h3>
-    <p>The positions were compared with NASA JPL’s DE440 ephemeris (via Horizons) over 1800–2050:</p>
-    <table>
-      <tr><th>What</th><th>Largest error, 1800–2050</th></tr>
-      <tr><td>Planets as seen from Earth</td><td>&lt; 25″ (the eye resolves ~60″)</td></tr>
-      <tr><td>Moon</td><td>&lt; 21 km (12″)</td></tr>
-      <tr><td>Io, Europa, Ganymede, Callisto</td><td>&lt; 920 km (≤ 0.12° of their orbits)</td></tr>
-      <tr><td>Titan · Phobos · Deimos</td><td>&lt; 900 km · 20 km · 56 km</td></tr>
-      <tr><td>Triton · Charon</td><td>&lt; 100 km · 1 km</td></tr>
-      <tr><td>Solar eclipses (1919, 1999, 2024, 2027)</td><td>greatest eclipse within 5 km and 5 s of NASA’s canon</td></tr>
-    </table>
-    <p>Outside 1800–2050 the planets stay good to about an arcminute for centuries. The moons of Mars, Saturn, Neptune and Pluto are extrapolated fits. Earth’s rotation depends on ΔT, the slowly growing lag of Earth’s rotation behind atomic time: the model uses the measured values (telescopic timings since 1657, atomic clocks since 1955) and the official prediction to 2033. Before 1657 ΔT is estimated from historical eclipse records and uncertain by minutes; beyond the 2030s it cannot be predicted well, so eclipse tracks can shift east–west by tens of km. Outside 1800–2050 an <b>Extrapolated</b> tag appears next to the clock.</p>
-    <p>Dates before 15 October 1582 are in the Julian calendar, as in historical records and NASA’s eclipse canon. The Gregorian reform then skipped ten days.</p>
+    <details>
+      <summary>Shadows and eclipses</summary>
+      <p>Shadows are computed for every point on a surface from the true sizes and distances of the Sun and of the body in the way. They are therefore correct at every scale setting, even when the Moon is drawn closer than it really is. The Sun’s limb darkening is included (the light left in a deep partial shadow comes from the Sun’s redder edge, which tints it brown), and so is the light’s travel time: the sunlight hitting Earth passed the Moon 1.3 s earlier, which moves a solar eclipse 35 km along its track.</p>
+      <p>During a lunar eclipse the Moon turns copper-red, because the only light reaching it has been bent and reddened by Earth’s atmosphere. Saturn’s rings cast shadows on the planet and Saturn casts one on its rings. Jupiter’s moons cast theirs on Jupiter and disappear into its shadow, whose flattened shape is taken into account (it lengthens Io’s eclipses by three minutes). Pluto and Charon eclipse each other only in two seasons of each 248-year orbit, the last in 1985–1990.</p>
+      <p>One liberty: where a moon’s shadow falls on its planet, the partial shadow is drawn darker than a light meter would record. On a screen a surface at half light looks almost fully lit, and the Moon’s partial shadow, thousands of km across, would shrink to a dark dot. Where every shadow begins and ends, and the full shadow itself, are exact. Earth’s shadow on the Moon needs no such help and is drawn as measured.</p>
+    </details>
 
-    <h3>What the picture shows</h3>
-    <p>The Sun is the only light, so night sides are black, as a camera exposed for daylight sees them; Earth’s night side shows its city lights. Distant worlds are brightened so they stay visible (Neptune receives 1/900 of the sunlight Earth does). The Sun’s disc is drawn as it looks in white light through a filter: featureless, darker and redder toward its edge. Around it is the glare it would cause in an eye or a camera exposed for the planets, which drowns the nearby stars; it fades as the disc grows large, as it does in a close or telescope view. Behind the stars lies the faint glow of the Milky Way, with the Magellanic Clouds and the Andromeda galaxy. Earth’s atmosphere is a thin blue haze toward the limb, lit only where sunlight reaches it. The Moon and other dusty airless worlds scatter light back toward the Sun, so a full Moon is evenly bright to its edge instead of shading like a ball. Every moon turns according to the IAU rotation models, including the slight rocking (libration) that keeps the Moon from showing exactly the same face. Each orbit line is the ellipse the body would follow if nothing but its primary pulled on it, fitted to its motion at this instant. Earth’s is the ellipse of the Earth–Moon pair’s centre of mass (which lies 4,700 km from Earth’s centre, inside the Earth), drawn through Earth’s centre: Earth itself weaves a few thousand km to either side of it every month. From Saturn outward the ellipses are drawn around the Solar System’s centre of mass, which the Sun itself circles because of Jupiter’s pull.</p>
-    <p>Some things are representative rather than exact: cloud patterns on Earth, Venus, Jupiter and the other giants are snapshots (Venus’s clouds do circle the planet every four days, as the real ones do), sunspots are not shown, and the fine structure of Saturn’s rings comes from an image whose opacity is scaled to measured values. Phobos and Deimos are drawn as ellipsoids of their true dimensions. Parts of Charon and Triton have never been seen, because they were in polar night when New Horizons and Voyager 2 flew past; they are filled in plain grey. Voyager saw Triton’s colours only through orange, violet and ultraviolet filters, so its map is shown in grey, tinted with the moon’s overall colour.</p>
+    <details id="guideAccuracy">
+      <summary>How accurate is it?</summary>
+      <p>The positions were compared with NASA JPL’s DE440 ephemeris (via Horizons) over 1800–2050:</p>
+      <table>
+        <tr><th>What</th><th>Largest error, 1800–2050</th></tr>
+        <tr><td>Planets as seen from Earth</td><td>&lt; 25″ (the eye resolves ~60″)</td></tr>
+        <tr><td>Moon</td><td>&lt; 21 km (12″)</td></tr>
+        <tr><td>Io, Europa, Ganymede, Callisto</td><td>&lt; 900 km (≤ 0.12° of their orbits)</td></tr>
+        <tr><td>Titan · Phobos · Deimos</td><td>&lt; 850 km · 20 km · 56 km</td></tr>
+        <tr><td>Mimas, Enceladus, Tethys, Dione, Rhea</td><td>&lt; 270 km (&lt; 0.1° of their orbits)</td></tr>
+        <tr><td>Iapetus</td><td>&lt; 1,400 km (0.02°)</td></tr>
+        <tr><td>Triton · Charon</td><td>&lt; 100 km · 1 km</td></tr>
+        <tr><td>Solar eclipses (1919, 1999, 2024, 2027)</td><td>greatest eclipse within 5 km and 5 s of NASA’s canon</td></tr>
+      </table>
+      <p>Outside 1800–2050 an <b>Extrapolated</b> tag appears next to the clock. The planets stay good to about an arcminute for centuries; the moons of Mars, Saturn, Neptune and Pluto are extrapolated fits.</p>
+      <p>Earth’s rotation depends on ΔT, the slowly growing lag of Earth’s rotation behind atomic time. The model uses the measured values (telescopic timings since 1657, atomic clocks since 1955) and the official prediction to 2033. Before 1657 ΔT is estimated from historical eclipse records and uncertain by minutes; beyond the 2030s it cannot be predicted well, so eclipse tracks can shift east–west by tens of km.</p>
+      <p>Dates before 15 October 1582 are in the Julian calendar, as in historical records and NASA’s eclipse canon. The Gregorian reform then skipped ten days.</p>
+    </details>
 
-    <h3>Sources and credits</h3>
-    <ul>
-      <li>Ephemerides: <a href="https://github.com/cosinekitty/astronomy" target="_blank" rel="noopener">Astronomy Engine</a> (Don Cross, MIT): VSOP87, Brown’s lunar theory (Improved Lunar Ephemeris), Lainey L1.2; satellite fits to <a href="https://ssd.jpl.nasa.gov/horizons/" target="_blank" rel="noopener">JPL Horizons</a>.</li>
-      <li>Rotation: IAU WGCCRE 2015 (Archinal et al. 2018), for the moons via NASA NAIF’s pck00011 kernel. ΔT: US Naval Observatory and IERS.</li>
-      <li>Physics of the picture: lunar–Lambert photometry (McEwen 1991); Saturn’s ring optical depths (Colwell et al. 2009); Danjon’s rule for Earth’s shadow.</li>
-      <li>Stars: Yale Bright Star Catalogue, 5th ed. (Hoffleit &amp; Warren, via CDS). Milky Way: <a href="https://svs.gsfc.nasa.gov/4851" target="_blank" rel="noopener">Deep Star Maps 2020</a>, NASA/Goddard Space Flight Center Scientific Visualization Studio, from Hipparcos-2, Tycho-2 and Gaia DR2 (ESA/Gaia/DPAC).</li>
-      <li>Planet and Sun maps: <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener">Solar System Scope</a> (CC BY 4.0), based on NASA data.</li>
-      <li>Io, Ganymede, Callisto, Europa, Phobos: USGS Astrogeology / NASA / JPL Voyager and Galileo global mosaics (public domain); Callisto’s patchwork look is the uneven coverage of those missions. Pluto: NASA / JHUAPL / SwRI, New Horizons (public domain). Charon: USGS Astrogeology New Horizons LORRI/MVIC global mosaic; Triton: USGS Astrogeology Voyager 2 global color mosaic (both public domain).</li>
-      <li>Rendering: <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> (MIT). Fonts: IBM Plex (OFL).</li>
-    </ul>
-    <p>This is free, with no ads and no account needed. If it's useful to you, you can <a href="https://ko-fi.com/lucajanken" target="_blank" rel="noopener">buy me a coffee ☕</a>.</p>
+    <details>
+      <summary>What the picture shows</summary>
+      <p>The Sun is the only light, so night sides are black, as a camera exposed for daylight sees them; Earth’s night side shows its city lights. Distant worlds are brightened so they stay visible (Neptune receives 1/900 of the sunlight Earth does).</p>
+      <p>The Sun’s disc is drawn as it looks in white light through a filter: featureless, darker and redder toward its edge. Around it is the glare it would cause in an eye or a camera exposed for the planets, which drowns the nearby stars; it fades as the disc grows large, as it does in a close or telescope view. Its fine radial streaks are light scattered inside the eye’s lens, and like the real ones they change as you look around. Behind the stars lies the faint glow of the Milky Way, with the Magellanic Clouds and the Andromeda galaxy.</p>
+      <p>Earth’s atmosphere is a thin blue haze toward the limb, lit only where sunlight reaches it. The Moon and other dusty airless worlds scatter light back toward the Sun, so a full Moon is evenly bright to its edge instead of shading like a ball. Every moon turns according to the IAU rotation models, including the slight rocking (libration) that keeps the Moon from showing exactly the same face.</p>
+      <p>Each orbit line is the ellipse the body would follow if nothing but its primary pulled on it, fitted to its motion at this instant. Earth’s is the ellipse of the Earth–Moon pair’s centre of mass (4,700 km from Earth’s centre, inside the Earth), drawn through Earth’s centre: Earth itself weaves a few thousand km to either side of it every month. From Saturn outward the ellipses are drawn around the Solar System’s centre of mass, which the Sun itself circles because of Jupiter’s pull.</p>
+      <p>Some things are representative rather than exact:</p>
+      <ul>
+        <li>Cloud patterns on Earth, Venus, Jupiter and the other giants are snapshots (Venus’s clouds do circle the planet every four days, as the real ones do), and sunspots are not shown.</li>
+        <li>The fine structure of Saturn’s rings comes from an image whose opacity is scaled to measured values.</li>
+        <li>Phobos and Deimos are drawn as ellipsoids of their true dimensions.</li>
+        <li>Parts of Charon and Triton have never been seen, because they were in polar night when New Horizons and Voyager 2 flew past; they are filled in plain grey. Voyager saw Triton’s colours only through orange, violet and ultraviolet filters, so its map is shown in grey, tinted with the moon’s overall colour.</li>
+      </ul>
+    </details>
+
+    <details>
+      <summary>Sources and credits</summary>
+      <ul>
+        <li>Ephemerides: <a href="https://github.com/cosinekitty/astronomy" target="_blank" rel="noopener">Astronomy Engine</a> (Don Cross, MIT): VSOP87, Brown’s lunar theory (Improved Lunar Ephemeris), Lainey L1.2; satellite fits to <a href="https://ssd.jpl.nasa.gov/horizons/" target="_blank" rel="noopener">JPL Horizons</a>.</li>
+        <li>Rotation: IAU WGCCRE 2015 (Archinal et al. 2018), for the moons via NASA NAIF’s pck00011 kernel. ΔT: US Naval Observatory and IERS.</li>
+        <li>Physics of the picture: lunar–Lambert photometry (McEwen 1991); Saturn’s ring optical depths (Colwell et al. 2009); Danjon’s rule for Earth’s shadow.</li>
+        <li>Stars: Yale Bright Star Catalogue, 5th ed. (Hoffleit &amp; Warren, via CDS). Milky Way: <a href="https://svs.gsfc.nasa.gov/4851" target="_blank" rel="noopener">Deep Star Maps 2020</a>, NASA/Goddard Space Flight Center Scientific Visualization Studio, from Hipparcos-2, Tycho-2 and Gaia DR2 (ESA/Gaia/DPAC).</li>
+        <li>Planet and Sun maps: <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener">Solar System Scope</a> (CC BY 4.0), based on NASA data.</li>
+        <li>Io, Ganymede, Callisto, Europa, Phobos: USGS Astrogeology / NASA / JPL Voyager and Galileo global mosaics (public domain); Callisto’s patchwork look is the uneven coverage of those missions. Pluto: NASA / JHUAPL / SwRI, New Horizons (public domain). Charon: USGS Astrogeology New Horizons LORRI/MVIC global mosaic; Triton: USGS Astrogeology Voyager 2 global color mosaic (both public domain). Mimas, Enceladus, Tethys, Dione, Rhea, Iapetus: Cassini global color maps, 2014 (NASA/JPL-Caltech/Space Science Institute/Lunar and Planetary Institute), shown in their brightness only, tinted with each moon’s overall colour, as their colours were enhanced.</li>
+        <li>Rendering: <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> (MIT). Fonts: IBM Plex (OFL).</li>
+      </ul>
+      <p>The source code is on <a href="https://github.com/LucaJanken/your-solar-system" target="_blank" rel="noopener">GitHub</a>.</p>
+    </details>
+  </div>
+
+  <div class="sheet narrow" id="support" hidden role="dialog" aria-labelledby="supportTitle">
+    <button type="button" class="close" data-close>Close</button>
+    <h2 id="supportTitle">Support</h2>
+    <p>Your Solar System is free to use, with no ads and no account.</p>
+    <p>If you enjoy it or find it useful, you can support it by buying me a coffee. It helps keep the site running, and free of ads.</p>
+    <a class="btn primary kofi" href="https://ko-fi.com/lucajanken" target="_blank" rel="noopener">Buy me a coffee on Ko-fi</a>
+    <p class="byline">Made by Luca Janken · <a href="https://github.com/LucaJanken/your-solar-system" target="_blank" rel="noopener">source on GitHub</a></p>
   </div>
 
   <div id="toast" role="status"></div>

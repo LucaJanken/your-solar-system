@@ -14,6 +14,7 @@ const DEG = 180 / Math.PI, ARCSEC = 206264.806;
 const LIMITS = {
   planetsFromEarthArcsec: 30, moonKm: 30,
   Io: 1000, Europa: 1000, Ganymede: 1000, Callisto: 1000, Titan: 1000, Triton: 150, Charon: 5, Phobos: 25, Deimos: 70,
+  Mimas: 400, Enceladus: 150, Tethys: 350, Dione: 300, Rhea: 350, Iapetus: 2500,
 };
 
 export function horizonsChecks(fixture) {
@@ -181,11 +182,18 @@ export function deltaTChecks() {
 // optical libration of an eccentric orbit, ±2e radians (Phobos adds a forced libration of ~1.1°).
 // A sign or frame error would show up as tens of degrees.
 export function rotationChecks() {
-  const ecc = { Io: 0.0041, Europa: 0.0094, Ganymede: 0.0013, Callisto: 0.0074, Titan: 0.0288, Triton: 0.0002, Charon: 0.0002, Phobos: 0.0151, Deimos: 0.0003 };
+  const ecc = { Io: 0.0041, Europa: 0.0094, Ganymede: 0.0013, Callisto: 0.0074, Titan: 0.0288, Triton: 0.0002, Charon: 0.0002, Phobos: 0.0151, Deimos: 0.0003,
+    Mimas: 0.0196, Enceladus: 0.0047, Tethys: 0.0001, Dione: 0.0022, Rhea: 0.0010, Iapetus: 0.0286 };
   // Deimos: its IAU W carries 2.7° long-period terms, which the orbit fit follows to ~0.6°.
   // Charon: its IAU spin rate is 3e-6 °/day slower than the orbit fitted to PLU058, so the meridian
   // drifts 0.16° a century off the direction of Pluto (±0.3° over the 180 years sampled)
-  const extra = { Phobos: 1.3, Ganymede: 0.2, Deimos: 0.7, Charon: 0.3 };
+  const extra = { Phobos: 1.3, Ganymede: 0.2, Deimos: 0.7, Charon: 0.3,
+    // Iapetus: its orbit is tilted 15° to its equator, and the Sun swings its longitude by ~1° at
+    // periods near its orbit, which its slow rotation does not follow
+    Iapetus: 2.6 };
+  // Saturn's moons: the IAU puts their prime meridians at craters, from Voyager and Cassini control
+  // networks, not at the mean sub-Saturn point; the maps use the same longitudes
+  const offset = { Mimas: 8, Enceladus: 5, Iapetus: 7 };
   const st = Object.fromEntries(Object.keys(ecc).map(n => [n, { sum: 0, min: 1e9, max: -1e9, n: 0 }]));
   for (let k = 0; k < 600; k++) {
     const s = snapshot(Date.UTC(1850, 0, 1) + k * 0.3047 * 365.25 * 86400000);
@@ -198,7 +206,7 @@ export function rotationChecks() {
   }
   const res = Object.keys(ecc).map(n => {
     const o = st[n], mean = o.sum / o.n, half = (o.max - o.min) / 2, lim = 2 * ecc[n] * DEG * 1.25 + (extra[n] || 0.1);
-    return { n, mean, half, lim, ok: Math.abs(mean) < 3 && half < lim };
+    return { n, mean, half, lim, ok: Math.abs(mean) < (offset[n] || 3) && half < lim };
   });
   return [{ name: 'Moons’ IAU prime meridians face their planet (fixed offset + libration)', pass: res.every(r => r.ok),
     detail: res.map(r => `${r.n} ${r.mean.toFixed(1)}° ± ${r.half.toFixed(2)}° (≤ ${r.lim.toFixed(2)}°)`).join(', ') }];
