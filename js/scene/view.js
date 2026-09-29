@@ -47,6 +47,14 @@ export class View {
    * held still moves the midpoint half as far as the separation changes, a drag moves the midpoint
    * and keeps the separation; the gesture pans only if the midpoint moved more than 1.5 times the
    * change of separation, and anything in between stays a pinch.
+   *
+   * The fingers are judged together, once per frame (in update), not per pointer event: each
+   * finger's move arrives as its own event, and between the two the leading finger alone has moved,
+   * which is exactly the one-finger pinch above. Two fingers side by side dragged along their line
+   * were thus taken for a pinch, since there the lead changes the separation by the full step. For
+   * the same reason a finger that has not moved yet (a phone may hold back small moves) only allows
+   * a decision once the gesture is well under way, at 40 px. Until decided the fingers zoom, so
+   * waiting costs a pinch nothing, and a drag gets its little zoom undone.
    */
   _touchPan() {
     const touches = new Map();
@@ -58,7 +66,9 @@ export class View {
     // a finger added or lifted starts over, as OrbitControls does
     const regroup = () => {
       this.controls.enableZoom = true;
-      g = touches.size === 2 ? { start: measure(), mode: null, dist: this.distance() } : null;
+      g = touches.size === 2 ? {
+        start: measure(), from: [...touches.values()].map(p => ({ ...p })), mode: null, dist: this.distance(),
+      } : null;
     };
     this.dom.addEventListener('pointerdown', e => {
       if (e.pointerType !== 'touch') return;
@@ -67,21 +77,23 @@ export class View {
     });
     window.addEventListener('pointermove', e => {
       const p = touches.get(e.pointerId);
-      if (!p) return;
-      p.x = e.clientX; p.y = e.clientY;
-      if (!g || g.mode === 'pinch') return;
-      const m = measure();
-      if (g.mode === 'pan') { this.panBy(m.x - g.last.x, m.y - g.last.y); g.last = m; return; }
-      const moved = Math.hypot(m.x - g.start.x, m.y - g.start.y), stretched = Math.abs(m.sep - g.start.sep);
-      if (moved + stretched < 12) return;
-      g.mode = moved > 1.5 * stretched ? 'pan' : 'pinch';
-      // a drag also undoes the little zoom made while undecided (each finger's move arrives as its
-      // own event, so the separation wobbles); applied in update, after OrbitControls' pending zoom
-      if (g.mode === 'pan') { g.last = m; this.controls.enableZoom = false; this._keepDist = g.dist; }
+      if (p) { p.x = e.clientX; p.y = e.clientY; }
     }, { passive: true });
     const lift = e => { if (touches.delete(e.pointerId)) regroup(); };
     window.addEventListener('pointerup', lift, { passive: true });
     window.addEventListener('pointercancel', lift, { passive: true });
+    this._touchStep = () => {
+      if (!g || g.mode === 'pinch') return;
+      const m = measure();
+      if (g.mode === 'pan') { this.panBy(m.x - g.last.x, m.y - g.last.y); g.last = m; return; }
+      const moved = Math.hypot(m.x - g.start.x, m.y - g.start.y), stretched = Math.abs(m.sep - g.start.sep);
+      const both = [...touches.values()].every((p, i) => Math.hypot(p.x - g.from[i].x, p.y - g.from[i].y) > 3);
+      if (moved + stretched < (both ? 12 : 40)) return;
+      g.mode = moved > 1.5 * stretched ? 'pan' : 'pinch';
+      // a drag also undoes the little zoom made while undecided; applied below in update, after
+      // OrbitControls' pending zoom
+      if (g.mode === 'pan') { g.last = m; this.controls.enableZoom = false; this._keepDist = g.dist; }
+    };
   }
 
   /** whether the view is on the focus body (target within 2% of the camera distance, a few pixels) or on its way there */
@@ -152,6 +164,7 @@ export class View {
 
   /** per frame, after display positions are known */
   update(disp, focusRadius, maxDist) {
+    this._touchStep();
     const o = disp[this.focus];
     const d = [o[0] - this.origin[0], o[1] - this.origin[1], o[2] - this.origin[2]];
     this.origin = o.slice();
