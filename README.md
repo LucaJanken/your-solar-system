@@ -40,7 +40,8 @@ GitHub Pages serves the repository as-is.
   of its lit side; a third time flies back out. Lock keeps the camera travelling with the
   selected body; locking again after drifting catches up with it. Axis shows its rotation axis.
 - Dragging (one finger) turns the view around the focus; scroll or pinch zooms. Moving the view
-  sideways (right- or shift-drag, arrow keys, two-finger drag) works only with Lock off. The phone
+  sideways (right- or shift-drag, arrow keys, two-finger drag) also works locked: the camera keeps
+  following the body from there. A two-finger gesture either pinches or drags, never both. The phone
   menu stays open while bodies are picked from it; a planet's moon count opens its moons in the
   list. The information panel starts folded down to the body's name: tapping it opens it, and
   its – button folds it again.
