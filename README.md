@@ -14,8 +14,9 @@ Everything on screen is computed for the displayed instant rather than animated 
   of eclipses and transits of Mercury and Venus takes you to any of them.
 - **The sky behind.** 9,096 stars from the Yale Bright Star Catalogue, moved by their proper motion,
   over the Milky Way.
-- **Overview to true scale.** A slider morphs from a compressed view where everything fits on one
-  screen to true scale, without ever distorting directions.
+- **True scale to overview.** It opens at true scale, with the whole system out to Neptune's orbit
+  in view; a slider morphs to a compressed overview where every body is visible, without ever
+  distorting directions.
 
 Plain HTML, CSS and JavaScript modules: no build step, no framework, no dependencies to install.
 GitHub Pages serves the repository as-is.

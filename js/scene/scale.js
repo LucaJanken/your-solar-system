@@ -41,7 +41,7 @@ function overviewMoon(name, parent, parentRkm) {
 }
 
 export class DisplayScale {
-  constructor() { this.s = 0; }
+  constructor() { this.s = 1; }
   /** drawn distance from the Sun for a heliocentric distance r (km) */
   helio(rKm) { return rKm <= 0 ? 0 : geo(60 * Math.pow(rKm / AU_KM, 0.42), rKm / UNIT_KM, this.s); }
   /** drawn radius for a true radius R (km) */

@@ -33,7 +33,7 @@ const state = {
   dir: 1,            // +1 forward, −1 backward
   parked: false,     // stopped by the speed slider's notch (so the slider shows 0, not the last rate)
   show: { orbits: true, labels: true, moons: true, stars: true, axis: true },
-  scaleTarget: 0,
+  scaleTarget: 1,
   selected: 'Sun',
 };
 
@@ -90,10 +90,22 @@ function orbitMapping(name) {
   return { centre: [pp[0] - me[0], pp[1] - me[1], pp[2] - me[2]], radial: r => scale.moon(name, def.parent, R, r) };
 }
 const drawnRadius = name => scale.size(meanRadius(BY_NAME[name]));
-const overviewDistance = () => 2.1 * scale.helio(30.1 * AU_KM);
+// The view of the whole system: Neptune's orbit, with a margin, fits the part of the screen the panels
+// leave free (clear of the side panel on computers), seen from SYSTEM_ELEV above the ecliptic.
+const SYSTEM_ELEV = 0.30;
+const SYSTEM_DIR = new THREE.Vector3(0, Math.sin(SYSTEM_ELEV), -Math.cos(SYSTEM_ELEV));
+function systemDistance() {
+  const W = stage.clientWidth || 1, H = stage.clientHeight || 1, R = 1.08 * scale.helio(30.1 * AU_KM);
+  const right = $('right').offsetParent ? $('right').getBoundingClientRect().left - 12 : W;
+  const tanV = Math.tan(DEFAULT_FOV * Math.PI / 360);
+  const tanX = tanV * Math.max(40, Math.min(W / 2, right - W / 2)) / (H / 2);
+  const tanY = tanV * Math.min(H, free.bottom - free.top) / H;
+  // the near side of the orbit is the farthest up or down the screen
+  return Math.max(R / tanX, R * Math.cos(SYSTEM_ELEV) + R * Math.sin(SYSTEM_ELEV) / tanY);
+}
 // largest drawn radius (equatorial, for flattened planets)
 const drawnExtent = name => { const d = BY_NAME[name]; return drawnRadius(name) * Math.max(...d.shape) / meanRadius(d); };
-const focusDistance = name => name === 'Sun' ? overviewDistance() : closeDistance(name);
+const focusDistance = name => name === 'Sun' ? systemDistance() : closeDistance(name);
 // A comfortable distance to look at a body from: it spans about 40% of the narrower side of the
 // part of the screen the panels leave free (so a phone held upright does not crop it), Saturn's
 // rings included.
@@ -178,12 +190,12 @@ function select(name, fly) {
 
 // Choosing the selected body again flies in to a comfortable view of it, from its lit side; once
 // there, choosing it again flies back out to where the camera was before (or to the distance of the
-// overview, if that was about as close).
+// whole system, if that was about as close).
 let zoomBack = null;   // { name, dist }: the distance to return to
 function closeLook(name) {
   const close = closeDistance(name), d = view.distance();
   if (view.focus === name && d < close * 1.5) {
-    const back = zoomBack && zoomBack.name === name && zoomBack.dist > close * 2 ? zoomBack.dist : Math.max(overviewDistance(), close * 4);
+    const back = zoomBack && zoomBack.name === name && zoomBack.dist > close * 2 ? zoomBack.dist : Math.max(systemDistance(), close * 4);
     zoomBack = null;
     view.setFocus(name, disp, { dist: back });
   } else {
@@ -201,13 +213,15 @@ function setScale(s, animate = true) {
   if (animate && !REDUCED_MOTION) scaleAnim = { from: scale.s, to: s, t0: performance.now(), ms: 2200 };
   else { scaleAnim = null; applyScale(s); }
 }
-// keep the camera framing the same thing while every length changes
+// keep the camera framing the same thing while every length changes: from beyond Neptune's orbit,
+// the whole system (the two agree at the orbit itself)
 function applyScale(s) {
-  const f = view.focus, cd = view.distance();
-  const before = { r: drawnRadius(f), d: helioInverse(cd) };
+  const f = view.focus, cd = view.distance(), NEPTUNE_KM = 30.1 * AU_KM;
+  const before = { r: drawnRadius(f), d: helioInverse(cd), n: scale.helio(NEPTUNE_KM) };
   scale.s = s;
   let factor;
   if (f !== 'Sun' && cd < 12 * before.r) factor = drawnRadius(f) / before.r;
+  else if (cd > before.n) factor = scale.helio(NEPTUNE_KM) / before.n;
   else factor = scale.helio(before.d) / cd;
   if (Number.isFinite(factor) && factor > 0) { view.rescale(factor); if (zoomBack) zoomBack.dist *= factor; }
   $('scale').value = s;
@@ -882,7 +896,7 @@ function wire() {
         if (!document.querySelector('.sheet:not([hidden])')) {
           camera.fov = DEFAULT_FOV; camera.updateProjectionMatrix();
           select('Sun', false);
-          view.setFocus('Sun', disp, { dist: overviewDistance() });
+          view.setFocus('Sun', disp, { dist: systemDistance() });
         }
         closeSheets(); break;
       default: used = false;
@@ -915,7 +929,8 @@ setTimeMode(timeMode);
 const fromUrl = readUrl();
 refreshSnap();
 computeDisplay();
-camera.position.set(0, 0.42, 1).normalize().multiplyScalar(overviewDistance());
+measureFree();
+camera.position.copy(SYSTEM_DIR).multiplyScalar(systemDistance());
 select(fromUrl.sel || 'Sun', false);
 if (fromUrl.focus) {
   view.setFocus(fromUrl.focus, disp, { dist: focusDistance(fromUrl.focus), ms: 1 });
