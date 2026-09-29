@@ -180,7 +180,9 @@ function select(name, fly) {
   if (fly) {
     camera.fov = DEFAULT_FOV; camera.updateProjectionMatrix();
     const R = drawnExtent(name);
-    if (again) closeLook(name);
+    // chosen again after the view was moved sideways off it: back to the centre first, at the same zoom
+    if (again && view.focus === name && !view.centred()) view.glide({ minDist: R * 1.2, safeDist: R * 3 });
+    else if (again) closeLook(name);
     // otherwise only the target moves; zoom and angle stay the user's, unless the camera would be inside the body
     else view.setFocus(name, disp, { minDist: R * 1.2, safeDist: R * 3 });
   }

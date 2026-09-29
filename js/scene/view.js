@@ -18,15 +18,82 @@ export class View {
     this.controls.zoomSpeed = 1.2;
     this.controls.listenToKeyEvents(window);
     // one finger turns the view about the focus (the stars wheel past, so it reads as moving
-    // around it), two fingers pinch to zoom and, with Lock off, move the view sideways
+    // around it), two fingers pinch to zoom or drag to move the view sideways (see _touchPan)
     this.controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+    this.dom = dom;
     this.focus = 'Sun';
+    // Locked, the camera travels with the focus body, also when the view has been moved sideways
+    // off it: the offset is kept, so the body stays where it is on screen while time runs.
     this.lock = true;
     this.origin = [0, 0, 0];
     this.tween = null;
+    this._keepDist = 0;
     // an explicit fly (distance and direction) gives way to the user; a glide does not need to,
     // since it only translates and adds the user's own rotation, zoom and pan on top
     this.controls.addEventListener('start', () => { if (this.tween && this.tween.cancelable) this.tween = null; });
+    // With a mouse (right-drag, Ctrl/Shift-drag) or the arrow keys OrbitControls pans as usual; on a
+    // touchscreen it only zooms and _touchPan pans. Decided before OrbitControls sees the event
+    // (capture on window runs before the canvas).
+    window.addEventListener('pointerdown', e => { this.controls.enablePan = e.pointerType !== 'touch'; }, { capture: true, passive: true });
+    window.addEventListener('keydown', () => { this.controls.enablePan = true; }, { capture: true, passive: true });
+    this._touchPan();
+  }
+
+  /**
+   * On a touchscreen OrbitControls would pan with every drift of the fingers' midpoint during a
+   * pinch, easily taking the view off the body while zooming. So it only zooms, and each two-finger
+   * gesture is classified once its fingers have moved 12 px (midpoint travel plus change of
+   * separation), then kept to the end: a pinch only zooms, a drag only pans. A pinch with one finger
+   * held still moves the midpoint half as far as the separation changes, a drag moves the midpoint
+   * and keeps the separation; the gesture pans only if the midpoint moved more than 1.5 times the
+   * change of separation, and anything in between stays a pinch.
+   */
+  _touchPan() {
+    const touches = new Map();
+    let g = null;
+    const measure = () => {
+      const [a, b] = touches.values();
+      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, sep: Math.hypot(a.x - b.x, a.y - b.y) };
+    };
+    // a finger added or lifted starts over, as OrbitControls does
+    const regroup = () => {
+      this.controls.enableZoom = true;
+      g = touches.size === 2 ? { start: measure(), mode: null, dist: this.distance() } : null;
+    };
+    this.dom.addEventListener('pointerdown', e => {
+      if (e.pointerType !== 'touch') return;
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      regroup();
+    });
+    window.addEventListener('pointermove', e => {
+      const p = touches.get(e.pointerId);
+      if (!p) return;
+      p.x = e.clientX; p.y = e.clientY;
+      if (!g || g.mode === 'pinch') return;
+      const m = measure();
+      if (g.mode === 'pan') { this.panBy(m.x - g.last.x, m.y - g.last.y); g.last = m; return; }
+      const moved = Math.hypot(m.x - g.start.x, m.y - g.start.y), stretched = Math.abs(m.sep - g.start.sep);
+      if (moved + stretched < 12) return;
+      g.mode = moved > 1.5 * stretched ? 'pan' : 'pinch';
+      // a drag also undoes the little zoom made while undecided (each finger's move arrives as its
+      // own event, so the separation wobbles); applied in update, after OrbitControls' pending zoom
+      if (g.mode === 'pan') { g.last = m; this.controls.enableZoom = false; this._keepDist = g.dist; }
+    }, { passive: true });
+    const lift = e => { if (touches.delete(e.pointerId)) regroup(); };
+    window.addEventListener('pointerup', lift, { passive: true });
+    window.addEventListener('pointercancel', lift, { passive: true });
+  }
+
+  /** whether the view is on the focus body (target within 2% of the camera distance, a few pixels) or on its way there */
+  centred() { return !!this.tween || this.controls.target.length() < 0.02 * this.distance(); }
+
+  /** move camera and target sideways by (dx, dy) pixels so the scene follows the fingers, as OrbitControls pans */
+  panBy(dx, dy) {
+    const c = this.camera, t = this.controls.target;
+    const k = 2 * this.distance() * Math.tan(c.fov * Math.PI / 360) / (this.dom.clientHeight || 1);
+    _d.setFromMatrixColumn(c.matrix, 0).multiplyScalar(-dx * k);
+    _o.setFromMatrixColumn(c.matrix, 1).multiplyScalar(dy * k);
+    c.position.add(_d).add(_o); t.add(_d).add(_o);
   }
 
   distance() { return this.camera.position.distanceTo(this.controls.target); }
@@ -117,13 +184,11 @@ export class View {
       c.position.copy(t).addScaledVector(dir, dist);
       if (k >= 1) this.tween = null;
     }
-    // Moving the view sideways (two fingers, right- or shift-drag, arrow keys) would take it off
-    // the body it is locked to, so only an unlocked camera can; a pinch then only zooms.
-    this.controls.enablePan = !this.lock;
     const nearFocus = t.length() < focusRadius * 0.5;
     this.controls.minDistance = nearFocus ? focusRadius * 1.02 : 1e-9;
     this.controls.maxDistance = maxDist;
     this.controls.update();
+    if (this._keepDist) { _o.subVectors(c.position, t).setLength(this._keepDist); c.position.copy(t).add(_o); this._keepDist = 0; }
     const cd = this.distance();
     // logarithmic depth buffer: a generous range costs nothing, but the near plane must stay in
     // front of the closest surface
