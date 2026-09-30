@@ -395,8 +395,9 @@ export function atmosphereMaterial(atmo, innerRatio, u) {
         // work in the shell's own frame, where it is the unit sphere
         vPos = position;
         vToKm = mat3(modelMatrix) * uPhysScale;   // shell frame → km from the centre, world axes
-        vCam = (inverse(modelMatrix) * vec4(cameraPosition, 1.0)).xyz;
-        vSun = normalize(inverse(mat3(modelMatrix)) * uSunRel);
+        mat3 toShell = inverse(mat3(modelMatrix));
+        vCam = toShell * (cameraPosition - modelMatrix[3].xyz);
+        vSun = normalize(toShell * uSunRel);
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         #include <logdepthbuf_vertex>
       }`,
