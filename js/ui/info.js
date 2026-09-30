@@ -16,8 +16,10 @@ function dl(el, rows) {
   for (const [k, v, extra] of rows) {
     if (v === null || v === undefined || v === '') continue;
     const cls = extra ? ' class="x"' : '';
-    // exponents written as 10^n are set as superscripts
-    html += `<dt${cls}>${esc(k)}</dt><dd${cls}>${esc(v).replace(/\^(-?\d+)/g, '<sup>$1</sup>')}</dd>`;
+    // exponents written as 10^n are set as superscripts; a short aside in brackets, such as
+    // (1411.4 million km), is kept on one line, so it wraps whole instead of leaving a word behind
+    const val = esc(v).replace(/\(([^)]{1,22})\)/g, m => m.replace(/ /g, '\u00a0')).replace(/\^(-?\d+)/g, '<sup>$1</sup>');
+    html += `<dt${cls}>${esc(k)}</dt><dd${cls}>${val}</dd>`;
   }
   // most values stay put from one refresh to the next
   if (shownHtml.get(el) !== html) { el.innerHTML = html; shownHtml.set(el, html); }
@@ -51,10 +53,8 @@ export class InfoPanel {
   setMin(on) {
     this.min = on;
     this.el.classList.toggle('min', on);
-    this.minBtn.textContent = on ? '+' : '–';
     this.minBtn.setAttribute('aria-expanded', !on);
     this.minBtn.setAttribute('aria-label', on ? 'Show details' : 'Hide details');
-    this.minBtn.title = on ? 'Show the details' : 'Hide the details';
   }
 
   show(name) {
@@ -90,7 +90,9 @@ export class InfoPanel {
     if (d.synchronous) rows.push(['Rotation', 'always shows ' + d.parent + ' the same face']);
     else if (d.rotationH) {
       rows.push(['Spins once in', fmtHours(d.rotationH) + (d.rotationH < 0 ? ', backwards' : '') + (d.rotationNote ? ' (' + d.rotationNote + ')' : '')]);
-      if (d.solarDayH) rows.push(['Day (noon to noon)', fmtHours(d.solarDayH)]);
+      // the Sun turns more slowly toward its poles
+      if (d.polarRotationD) rows.push(['At the poles', '~' + d.polarRotationD + ' days']);
+      if (d.solarDayH) rows.push(['Noon to noon', fmtHours(d.solarDayH)]);
     }
     if (d.obliquity !== undefined) rows.push(['Axial tilt', d.obliquity.toFixed(2) + '°', true]);
     if (d.synodicD) rows.push(['Lunar month', d.synodicD.toFixed(3) + ' days (new moon to new moon)', true]);

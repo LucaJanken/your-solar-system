@@ -2,7 +2,6 @@
 import * as THREE from '../vendor/three.min.js';
 import { snapshot, AU_KM } from './astro/ephemeris.js';
 import { EventTimeline, eventService } from './astro/events.js';
-import { DT_MEASURED_UNTIL } from './astro/deltat.js';
 import { BODIES, BY_NAME, meanRadius } from './data/bodies.js';
 import { DisplayScale, toScene } from './scene/scale.js';
 import { BodyViews } from './scene/bodies.js';
@@ -13,6 +12,7 @@ import { Labels } from './scene/labels.js';
 import { SunGlare } from './scene/glare.js';
 import { SUN_INTENSITY } from './scene/shaders.js';
 import { InfoPanel } from './ui/info.js';
+import { HudVisibility, onTap } from './ui/hud.js';
 import { fmtDate, fmtTime, tzName, localInput, parseLocalInput, civil, fmtRate } from './ui/format.js';
 
 const $ = id => document.getElementById(id);
@@ -21,17 +21,16 @@ const DAY_MS = 86400000;
 const MIN_MS = Date.UTC(1000, 0, 6), MAX_MS = Date.UTC(2999, 11, 31, 23, 59);
 const VALID_FROM = Date.UTC(1800, 0, 1), VALID_TO = Date.UTC(2051, 0, 1);
 const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-// The speed slider is signed and logarithmic: its value is ±(NOTCH + log10 |rate|), and the notch
-// in the middle, |value| < NOTCH, stops time. Just outside the notch runs at real time.
-const SPEED_MAX = 8.2, NOTCH = 0.7;
+// The speed slider runs forward only and is logarithmic: its value is log10 |rate|, from real time
+// (0) to about five years per second. The direction is a separate switch (reverse).
+const SPEED_MAX = 8.2;
 
 // ---------------------------------------------------------------- state
 const state = {
   simMs: Date.now(),
   playing: !REDUCED_MOTION,
   speed: 0,          // log10 |simulated seconds per real second|: 0 is real time
-  dir: 1,            // +1 forward, −1 backward
-  parked: false,     // stopped by the speed slider's notch (so the slider shows 0, not the last rate)
+  dir: 1,            // +1 forward, −1 backward (the reverse button)
   show: { orbits: true, labels: true, moons: true, stars: true, axis: true },
   scaleTarget: 1,
   selected: 'Sun',
@@ -96,7 +95,10 @@ const SYSTEM_ELEV = 0.30;
 const SYSTEM_DIR = new THREE.Vector3(0, Math.sin(SYSTEM_ELEV), -Math.cos(SYSTEM_ELEV));
 function systemDistance() {
   const W = stage.clientWidth || 1, H = stage.clientHeight || 1, R = 1.08 * scale.helio(30.1 * AU_KM);
-  const right = $('right').offsetParent ? $('right').getBoundingClientRect().left - 12 : W;
+  // the bodies list is in the way where it reaches down toward the middle of the screen (on
+  // computers), the toolbar across the top corner is not
+  const col = $('bodies').getBoundingClientRect();
+  const right = !hud.hidden && col.bottom > H * 0.4 ? col.left - 12 : W;
   const tanV = Math.tan(DEFAULT_FOV * Math.PI / 360);
   const tanX = tanV * Math.max(40, Math.min(W / 2, right - W / 2)) / (H / 2);
   const tanY = tanV * Math.min(H, free.bottom - free.top) / H;
@@ -146,6 +148,7 @@ let viewShift = 0, shiftTarget = 0, shiftApplied = null;
 function measureFree() {
   const W = stage.clientWidth, H = stage.clientHeight, cx = W / 2;
   free.top = 0; free.bottom = H;
+  if (hud.hidden) { shiftTarget = 0; return; }
   for (const el of [document.querySelector('header.time'), $('info'), document.querySelector('.timectl')]) {
     if (!el.offsetParent) continue;
     const r = el.getBoundingClientRect();
@@ -173,7 +176,7 @@ function select(name, fly) {
   wake();
   const again = name === state.selected;
   state.selected = name;
-  openSystems.add(systemOf(name));
+  openSystemOf(name);
   info.show(name);
   info.update(snap);
   paintList();
@@ -226,7 +229,9 @@ function applyScale(s) {
   else if (cd > before.n) factor = scale.helio(NEPTUNE_KM) / before.n;
   else factor = scale.helio(before.d) / cd;
   if (Number.isFinite(factor) && factor > 0) { view.rescale(factor); if (zoomBack) zoomBack.dist *= factor; }
-  $('scale').value = s;
+  // the slider has true scale on the left
+  $('scale').value = 1 - s;
+  $('scale').setAttribute('aria-valuetext', s === 1 ? 'true scale' : s === 0 ? 'overview' : Math.round((1 - s) * 100) + '% toward the overview');
   $('scaleMin').classList.toggle('on', s === 0);
   $('scaleMax').classList.toggle('on', s === 1);
 }
@@ -246,40 +251,13 @@ function setTime(ms, { pause = false } = {}) {
 }
 const setRate = () => state.dir * Math.pow(10, state.speed);   // the rate while playing
 const rate = () => state.playing ? setRate() : 0;
-function setSpeed(x) { state.speed = Math.max(0, Math.min(SPEED_MAX, +x.toFixed(2))); state.parked = false; hudDirty = true; }
-// the time step of the ◂ ▸ buttons (and , .): calendar months and years keep the day and time
-const STEPS = [
-  { label: '1 h', name: 'hour', ms: 3600000 }, { label: '1 d', name: 'day', ms: DAY_MS },
-  { label: '1 mo', name: 'month', months: 1 }, { label: '1 yr', name: 'year', months: 12 },
-];
-let step = STEPS[1];
-try { step = STEPS.find(s => s.name === localStorage.getItem('solarSystem.step')) || step; } catch {}
-function stepTime(sign) {
-  if (step.ms) return setTime(state.simMs + sign * step.ms);
-  // in UTC, clamped to the length of the month (31 Jan + 1 month is 28 or 29 Feb)
-  const d = new Date(state.simMs), day = d.getUTCDate();
-  d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + sign * step.months);
-  d.setUTCDate(Math.min(day, new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()));
-  setTime(d.getTime());
-}
-function setStep(s) {
-  step = s;
-  try { localStorage.setItem('solarSystem.step', s.name); } catch {}
-  $('stepBtn').textContent = s.label;
-  $('stepBtn').setAttribute('aria-label', `Step: one ${s.name}. Change`);
-  $('backBtn').title = `Back one ${s.name} ( , )`; $('backBtn').setAttribute('aria-label', $('backBtn').title);
-  $('fwdBtn').title = `Forward one ${s.name} ( . )`; $('fwdBtn').setAttribute('aria-label', $('fwdBtn').title);
-}
-// − and + (and [ ]) move the speed slider one step left or right, as dragging it would: toward the
-// middle a rate slows down to real time, then stops in the notch, then runs the other way
-function stepSpeed(sign) {
-  if (!state.playing && state.parked) { state.dir = sign; state.speed = 0; state.parked = false; state.playing = true; }
-  else if (sign === state.dir) setSpeed(state.speed + 0.25);
-  else if (state.speed > 0) setSpeed(state.speed - 0.25);
-  else { state.playing = false; state.parked = true; }
-  hudDirty = true;
-}
-function setPlaying(on) { state.playing = on; if (on) state.parked = false; hudDirty = true; }
+function setSpeed(x) { state.speed = Math.max(0, Math.min(SPEED_MAX, +x.toFixed(2))); hudDirty = true; }
+// [ and ] move the speed slider one step, slower or faster; paused, time stays paused
+const stepSpeed = sign => setSpeed(state.speed + 0.25 * sign);
+function setPlaying(on) { state.playing = on; hudDirty = true; }
+function setReverse(on) { state.dir = on ? -1 : 1; hudDirty = true; }
+// the time step of the former ◂ ▸ stepper, no longer used
+try { localStorage.removeItem('solarSystem.step'); } catch {}
 
 // ---------------------------------------------------------------- main loop
 let last = performance.now(), lastHud = 0, hudDirty = true, frameDt = 1 / 60, whenOpen = false;
@@ -341,7 +319,7 @@ function frame(now) {
   // labels (and screen positions for picking)
   const W = stage.clientWidth, H = stage.clientHeight;
   if (!hudBoxes) {
-    hudBoxes = [...document.querySelectorAll('[data-hud]')].filter(e => e.offsetParent).map(e => {
+    hudBoxes = hud.hidden ? [] : [...document.querySelectorAll('[data-hud]')].filter(e => e.offsetParent).map(e => {
       const r = e.getBoundingClientRect(); return { left: r.left - 4, right: r.right + 4, top: r.top - 4, bottom: r.bottom + 4 };
     });
     measureFree();
@@ -442,38 +420,50 @@ function updateHud() {
   timeEls.clock.textContent = fmtTime(d, utc);
   timeEls.date.textContent = fmtDate(d, utc);
   const julian = civil(d, utc).julian ? 'Julian calendar' : '';
-  timeEls.tz.textContent = [timeMode === 'Local' ? tzName(d) : timeMode === 'Scientific' ? 'UTC' : '', julian].filter(Boolean).join(' · ');
+  // Scientific shows UT (UT1), which the model takes UTC to be; the two differ by under 0.9 s
+  timeEls.tz.textContent = [timeMode === 'Local' ? tzName(d) : timeMode === 'Scientific' ? 'UT' : '', julian].filter(Boolean).join(' · ');
+  // empty (UTC in the Gregorian calendar), it would still take a gap in the row
+  timeEls.tz.hidden = !timeEls.tz.textContent;
   // nothing to say while inside the validated range
   timeEls.badge.hidden = state.simMs >= VALID_FROM && state.simMs < VALID_TO;
   if (timeMode === 'Scientific' && snap) {
-    $('tdUT').textContent = fmtTime(d, true);
     // TT runs about a minute ahead of UT, so near midnight it is already on the next day
     const ttMs = state.simMs + snap.deltaT * 1000;
     $('tdTT').innerHTML = fmtTime(new Date(ttMs), true) + dayTag(Math.floor(ttMs / DAY_MS) - Math.floor(state.simMs / DAY_MS));
-    const dtNote = state.simMs > DT_MEASURED_UNTIL ? ' (predicted)' : state.simMs < Date.UTC(1657, 0, 1) ? ' (estimated from historical eclipses)' : ' (measured)';
-    $('tdDT').textContent = snap.deltaT.toFixed(1) + ' s' + dtNote;
+    $('tdDT').textContent = snap.deltaT.toFixed(1) + ' s';
     $('tdJD').textContent = (snap.tt + 2451545).toFixed(5);
   }
   const when = $('when');
   // (not while it is being edited: in the popover, or in a phone's picker)
   if (!whenOpen && document.activeElement !== when) when.value = localInput(d, utc);
-  $('playBtn').textContent = state.playing ? 'Pause' : 'Play';
-  // Paused with the button, the rate stays visible (dimmed): it is what Play resumes at. Stopped in
-  // the slider's notch, time stands still and the rate says so.
-  const rateEl = $('rate'), stopped = !state.playing && state.parked;
-  rateEl.textContent = stopped ? fmtRate(0) : fmtRate(setRate());
-  rateEl.classList.toggle('paused', !state.playing && !stopped);
-  rateEl.title = state.playing ? 'Simulation speed' : stopped ? 'Stopped. Move the slider out of the middle, or press Play, to run time again.' : 'Paused. Play resumes at this speed.';
+  const play = $('playBtn');
+  play.classList.toggle('on', state.playing);
+  play.setAttribute('aria-label', state.playing ? 'Pause' : 'Play');
+  $('revBtn').setAttribute('aria-pressed', state.dir < 0);
+  // paused, the rate stays visible (dimmed): it is what Play resumes at
+  const rateEl = $('rate');
+  rateEl.textContent = fmtRate(setRate());
+  rateEl.classList.toggle('paused', !state.playing);
   const speed = $('speed');
-  if (document.activeElement !== speed) speed.value = !state.playing && state.parked ? 0 : state.dir * (state.speed + NOTCH);
-  speed.setAttribute('aria-valuetext', state.playing ? fmtRate(setRate()) : 'stopped, resumes at ' + fmtRate(setRate()));
+  if (document.activeElement !== speed) speed.value = state.speed;
+  speed.setAttribute('aria-valuetext', fmtRate(Math.pow(10, state.speed)) + (state.dir < 0 ? ', backward' : '') + (state.playing ? '' : ', paused'));
   if (snap) info.update(snap);
 }
 
 // ---------------------------------------------------------------- body list
 // planets whose moons are listed: the selected body's system opens by itself, and each planet's
-// moon count opens or closes its moons, so a moon can be chosen without flying to the planet first
+// arrow opens or closes its moons, so a moon can be chosen without flying to the planet first. A
+// system opened by selection closes again when a body of another system is selected, so going
+// through the planets one by one leaves only the current one open; one opened with its arrow
+// stays open until its arrow closes it.
 const openSystems = new Set();
+let autoOpened = null;   // the system that selection opened (none if it was open already)
+function openSystemOf(name) {
+  const sys = systemOf(name);
+  if (autoOpened && autoOpened !== sys) openSystems.delete(autoOpened);
+  if (autoOpened !== sys) autoOpened = openSystems.has(sys) ? null : sys;
+  openSystems.add(sys);
+}
 const systemOf = name => BY_NAME[name].parent && BY_NAME[name].parent !== 'Sun' ? BY_NAME[name].parent : name;
 function buildList() {
   const ul = $('bodyList');
@@ -496,10 +486,12 @@ function buildList() {
       exp.type = 'button';
       exp.className = 'exp';
       exp.dataset.system = def.name;
-      exp.dataset.n = nMoons;
       exp.setAttribute('aria-label', `${def.name}: ${nMoons} ${nMoons > 1 ? 'moons' : 'moon'}`);
+      exp.innerHTML = '<svg viewBox="0 0 8 8" aria-hidden="true"><path d="M2.25 1 5.75 4 2.25 7z"/></svg>';
       exp.addEventListener('click', () => {
         if (openSystems.has(def.name)) openSystems.delete(def.name); else openSystems.add(def.name);
+        // either way the arrow now decides: an opened system stays, a closed one is not reopened
+        if (autoOpened === def.name) autoOpened = null;
         paintList();
       });
       li.appendChild(exp);
@@ -507,12 +499,28 @@ function buildList() {
     ul.appendChild(li);
   }
 }
-// the phone layout's menu (bodies and view options); on wider screens they are always shown
-function setMenu(open) {
-  $('right').classList.toggle('open', open);
-  $('menuBtn').setAttribute('aria-expanded', open);
-  hudBoxes = null;
+// The top-right panel shows the list of bodies, the settings, or only its heading, whose Bodies and
+// Settings tabs each show their own content, or fold the panel if it is already shown (Esc, in the
+// settings, goes back to what was there before). On computers the list starts as it was left;
+// on phones the panel starts folded, and tapping the view folds it again, as it covers much of the
+// screen there.
+// the compact layout of style.css (phones, and tablets held upright)
+const PHONE = matchMedia('(max-width: 959px), (max-height: 480px)');
+let panel = null, beforeSettings = null;   // 'bodies', 'settings' or null (folded)
+function setPanel(v, remember = false) {
+  panel = v;
+  const el = $('bodies');
+  el.classList.toggle('folded', !v);
+  $('bodyList').hidden = v !== 'bodies';
+  $('settings').hidden = v !== 'settings';
+  $('bodiesTab').setAttribute('aria-expanded', v === 'bodies');
+  $('settingsTab').setAttribute('aria-expanded', v === 'settings');
+  if (remember && !PHONE.matches) try { localStorage.setItem('solarSystem.bodies', v === 'bodies' ? 'open' : 'folded'); } catch {}
+  hudBoxes = null; wake();
 }
+const openSettings = () => { beforeSettings = panel; setPanel('settings'); };
+let bodiesOpen = !PHONE.matches;
+try { if (bodiesOpen && localStorage.getItem('solarSystem.bodies') === 'folded') bodiesOpen = false; } catch {}
 function paintList() {
   const sel = state.selected, moons = state.show.moons;
   for (const li of document.querySelectorAll('.body-item')) {
@@ -522,10 +530,9 @@ function paintList() {
     if (li.dataset.parent) li.hidden = !(moons && openSystems.has(li.dataset.parent));
     if (exp) {
       const open = moons && openSystems.has(exp.dataset.system);
-      exp.textContent = exp.dataset.n + (moons ? open ? ' ▾' : ' ▸' : '');
       exp.setAttribute('aria-expanded', open);
       // with moons hidden there is nothing to open
-      exp.disabled = !moons;
+      exp.hidden = !moons;
     }
   }
   hudBoxes = null;
@@ -709,29 +716,84 @@ function jumpToEvent(e) {
   hudDirty = true;
 }
 
-// ---------------------------------------------------------------- sheets, toasts, sharing
-function openSheet(id) { closeSheets(); setMenu(false); $(id).hidden = false; $(id).querySelector('[data-close]').focus(); }
-function closeSheets() { for (const s of document.querySelectorAll('.sheet')) s.hidden = true; }
+// ---------------------------------------------------------------- sheets, toasts, links
+// The guide and the list of events: each one's button opens it and closes it again, as do a click or
+// tap outside it and Esc. The button is lit while its sheet is open.
+const SHEET_BTN = { guide: 'guideBtn', events: 'eventsBtn' };
+const openSheetEl = () => document.querySelector('.sheet:not([hidden])');
+function paintSheetBtns() { for (const [id, btn] of Object.entries(SHEET_BTN)) $(btn).setAttribute('aria-expanded', !$(id).hidden); }
+// Where the panels leave no room for it (phones, tablets held upright), the bodies panel and then
+// the information panel fold while the sheet is open, and open again when it closes. A press on the
+// Bodies or Settings tab closes the sheet without reopening the bodies panel, which the tab's own
+// click then sets (reopened first, the Bodies tab would fold it again at once).
+let unfoldAfterSheet = null;
+function openSheet(id) {
+  closeSheets();
+  $(id).hidden = false;
+  if (!placeSheet()) {
+    unfoldAfterSheet = { panel, info: !info.min };
+    if (panel) setPanel(null);
+    if (!placeSheet() && !info.min) { info.setMin(true); placeSheet(); }
+  }
+  paintSheetBtns(); $(id).querySelector('[data-close]').focus();
+}
+function closeSheets({ keepPanel = false } = {}) {
+  for (const s of document.querySelectorAll('.sheet')) s.hidden = true;
+  paintSheetBtns();
+  const u = unfoldAfterSheet;
+  unfoldAfterSheet = null;
+  if (u?.panel && !keepPanel) setPanel(u.panel);
+  if (u?.info) info.setMin(false);
+}
+// An open sheet sits in the space the panels leave free, so it covers none of them: beside them
+// where there is room (right of the clock and the information panel, left of the bodies panel, above
+// the time controls), otherwise between the panels at the top and those at the bottom (phones, and
+// tablets held upright). Where neither leaves enough room it is centred over everything (style.css),
+// and this returns false.
+function placeSheet() {
+  const s = openSheetEl();
+  if (!s) return true;
+  s.style.left = s.style.top = s.style.width = s.style.maxHeight = s.style.height = s.style.transform = '';
+  if (hud.hidden) return true;
+  const app = $('app').getBoundingClientRect(), gap = parseFloat(getComputedStyle($('app')).getPropertyValue('--gap')) || 20;
+  const box = el => { const r = el.getBoundingClientRect(); return { l: r.left - app.left, r: r.right - app.left, t: r.top - app.top, b: r.bottom - app.top }; };
+  const time = document.querySelector('header.time'), ctl = document.querySelector('.timectl');
+  let top = gap, bottom = box(ctl).t - gap, left = gap, right = app.width - gap;
+  if (!PHONE.matches) {
+    for (const el of [time, $('info')]) {
+      const r = box(el);
+      if (el.offsetParent && r.b > top && r.t < bottom) left = Math.max(left, r.r + gap);
+    }
+    const rc = box($('right'));
+    if (rc.b > top && rc.t < bottom) right = Math.min(right, rc.l - gap);
+  }
+  if (PHONE.matches || right - left < Math.min(420, s.offsetWidth)) {
+    left = gap; right = app.width - gap;
+    top = Math.max(box(time).b, box($('right')).b) + gap;
+    bottom = Math.min(bottom, box($('info')).t - gap);
+  }
+  // its own size, as style.css sets it, fitted into that space
+  const cs = getComputedStyle(s), w = Math.min(s.offsetWidth, right - left);
+  const h = Math.min(s.id === 'events' ? parseFloat(cs.height) : s.offsetHeight, bottom - top);
+  if (right - left < Math.min(420, s.offsetWidth) || h < 320) return false;
+  s.style.transform = 'none';
+  s.style.width = w + 'px';
+  s.style.left = left + (right - left - w) / 2 + 'px';
+  s.style.top = top + (bottom - top - h) / 2 + 'px';
+  if (s.id === 'events') s.style.height = h + 'px'; else s.style.maxHeight = h + 'px';
+  return true;
+}
 let toastTimer = 0;
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 3200); }
 
-function shareUrl() {
-  const off = camera.position.clone().sub(view.controls.target);
-  const q = new URLSearchParams({
-    t: new Date(state.simMs).toISOString().replace('.000Z', 'Z'), focus: view.focus, sel: state.selected,
-    scale: scale.s.toFixed(3), speed: state.speed.toFixed(2), play: state.playing ? 1 : 0,
-    cam: [off.x, off.y, off.z].map(x => +x.toPrecision(5)).join(','),
-  });
-  if (state.dir < 0) q.set('dir', -1);
-  if (camera.fov !== DEFAULT_FOV) q.set('fov', +camera.fov.toPrecision(4));
-  return location.origin + location.pathname + '#' + q.toString();
-}
+// A view given in the URL hash (#t=…&focus=…&sel=…&scale=…&speed=…&dir=-1&play=0&cam=…&fov=…), as
+// the former Share view wrote it. Still read, for old links and the screenshot script; never written.
 function readUrl() {
   const q = new URLSearchParams(location.hash.slice(1));
   const t = Date.parse(q.get('t') || '');
   if (!Number.isNaN(t)) setTime(t);
   const num = k => q.has(k) && Number.isFinite(+q.get(k)) ? +q.get(k) : null;
-  // speed: log10 |rate|; links from before the signed slider have no `dir` and ran forward
+  // speed: log10 |rate|; dir=-1 turns on reverse (links without it ran forward)
   if (num('speed') !== null) state.speed = Math.max(0, Math.min(SPEED_MAX, num('speed')));
   state.dir = num('dir') === -1 ? -1 : 1;
   if (q.has('play')) state.playing = q.get('play') === '1';
@@ -746,7 +808,7 @@ function paintToggles() {
   for (const b of document.querySelectorAll('[data-toggle]')) {
     const k = b.dataset.toggle;
     const on = k === 'lock' ? view.lock : state.show[k];
-    b.setAttribute('aria-pressed', on);
+    b.setAttribute('aria-checked', on);
   }
 }
 function wire() {
@@ -787,32 +849,18 @@ function wire() {
     if (k === 'moons') paintList();
     paintToggles();
   });
-  $('scale').addEventListener('input', e => setScale(+e.target.value, false));
+  $('scale').addEventListener('input', e => setScale(1 - e.target.value, false));
   $('scaleMin').addEventListener('click', () => setScale(0));
   $('scaleMax').addEventListener('click', () => setScale(1));
   $('playBtn').addEventListener('click', () => setPlaying(!state.playing));
-  $('backBtn').addEventListener('click', () => stepTime(-1));
-  $('fwdBtn').addEventListener('click', () => stepTime(1));
-  $('stepBtn').addEventListener('click', () => setStep(STEPS[(STEPS.indexOf(step) + 1) % STEPS.length]));
-  setStep(step);
+  $('revBtn').addEventListener('click', () => setReverse(state.dir > 0));
   $('nowBtn').addEventListener('click', () => setTime(Date.now()));
-  $('speed').addEventListener('input', e => {
-    const v = +e.target.value;
-    if (Math.abs(v) < NOTCH) { state.playing = false; state.parked = true; }
-    else {
-      // leaving the notch starts time again; a pause from the button stays a pause
-      const wasParked = state.parked;
-      state.dir = Math.sign(v); setSpeed(Math.abs(v) - NOTCH);
-      if (wasParked) state.playing = true;
-    }
-    hudDirty = true;
-  });
-  $('slowBtn').addEventListener('click', () => stepSpeed(-1));
-  $('fastBtn').addEventListener('click', () => stepSpeed(1));
+  // the slider sets the speed only: a pause stays a pause
+  $('speed').addEventListener('input', e => setSpeed(+e.target.value));
 
   // The calendar button. On touchscreens the date input lies invisibly over it (style.css), so a tap
   // opens the system's own picker, and the date it sets is applied at once. On computers the button
-  // opens the input as a popover: a date typed or picked there is applied with Go or Enter, and Esc
+  // opens the input as a popover: a date typed or picked there is applied with Set or Enter, and Esc
   // (or a click elsewhere) leaves it.
   const when = $('when'), whenForm = $('whenForm'), whenBtn = $('whenBtn');
   const touch = () => matchMedia('(pointer: coarse)').matches;
@@ -828,7 +876,9 @@ function wire() {
     when.value = localInput(new Date(state.simMs), timeMode !== 'Local');
     setWhenOpen(true);
     when.focus();
-    try { when.showPicker(); } catch {}
+    // on computers the popover is the picker (typing, or the field's own calendar icon); opening the
+    // system's picker as well put two calendars on screen
+    if (touch()) try { when.showPicker(); } catch {}
   });
   whenForm.addEventListener('submit', e => { e.preventDefault(); if (goToWhen()) { setWhenOpen(false); when.blur(); } });
   when.addEventListener('change', () => { if (touch() && when.value) goToWhen(); });
@@ -838,32 +888,33 @@ function wire() {
   window.addEventListener('pointerdown', e => { if (whenOpen && !e.target.closest('#whenForm, #whenBtn')) setWhenOpen(false); }, true);
   $('timeMode').addEventListener('click', () => setTimeMode(TIME_MODES[(TIME_MODES.indexOf(timeMode) + 1) % TIME_MODES.length]));
   $('badge').addEventListener('click', () => { openSheet('guide'); $('guideAccuracy').open = true; $('guideAccuracy').scrollIntoView({ block: 'start' }); });
-  $('eventsBtn').addEventListener('click', openEvents);
+  $('eventsBtn').addEventListener('click', () => $('events').hidden ? openEvents() : closeSheets());
   $('evList').addEventListener('scroll', queueEvFill, { passive: true });
   for (const b of document.querySelectorAll('[data-evkind]')) b.addEventListener('click', () => setEvKind(b.dataset.evkind));
-  $('guideBtn').addEventListener('click', () => openSheet('guide'));
-  $('supportBtn').addEventListener('click', () => openSheet('support'));
-  $('shareBtn').addEventListener('click', async () => {
-    const url = shareUrl();
-    history.replaceState(null, '', url);
-    try { await navigator.clipboard.writeText(url); toast('Link to this exact view copied.'); } catch { toast('Link is in the address bar.'); }
-  });
-  for (const c of document.querySelectorAll('[data-close]')) c.addEventListener('click', closeSheets);
+  $('guideBtn').addEventListener('click', () => $('guide').hidden ? openSheet('guide') : closeSheets());
+  // a press outside the open sheet closes it (its own button toggles it instead)
+  document.addEventListener('pointerdown', e => {
+    const s = openSheetEl();
+    if (s && !s.contains(e.target) && !e.target.closest('#guideBtn, #eventsBtn, #badge')) closeSheets({ keepPanel: !!e.target.closest('#bodiesTab, #settingsTab') });
+  }, true);
+  $('settingsTab').addEventListener('click', () => panel === 'settings' ? setPanel(null) : openSettings());
+  $('hideBtn').addEventListener('click', () => hud.set(true));
+  $('bodiesTab').addEventListener('click', () => setPanel(panel === 'bodies' ? null : 'bodies', true));
+  for (const c of document.querySelectorAll('[data-close]')) c.addEventListener('click', () => closeSheets());
   // the info panel changes height when "More data" opens or (on phones) when it expands
   $('more').addEventListener('toggle', () => { hudBoxes = null; });
   $('info').addEventListener('click', () => { hudBoxes = null; });
-  $('menuBtn').addEventListener('click', () => setMenu(!$('right').classList.contains('open')));
 
-  // click on the canvas: pick the body under the pointer
-  let down = null;
+  // A click or tap on the view picks the body under it; on empty space, with the interface hidden,
+  // it brings the interface back. Drags, pinches and two-finger drags do neither.
   const cv = renderer.domElement;
-  cv.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; setMenu(false); });
-  cv.addEventListener('pointerup', e => {
-    if (!down || Math.abs(e.clientX - down[0]) + Math.abs(e.clientY - down[1]) > 5) return;
+  cv.addEventListener('pointerdown', () => { if (PHONE.matches && !hud.hidden) setPanel(null); });
+  onTap(cv, e => {
     // the labels let touches through to the view (see style.css), so a tap on one
     // is found here
     const r = cv.getBoundingClientRect(), name = labels.at(e.clientX, e.clientY) || (pick(e.clientX - r.left, e.clientY - r.top) || {}).name;
     if (name) select(name, true);
+    else if (hud.hidden) hud.set(false);
   });
   // hover: a faint ring and a pointer cursor say that bodies can be clicked
   cv.addEventListener('pointermove', e => {
@@ -887,20 +938,20 @@ function wire() {
     switch (e.key) {
       // Space presses a button reached with the keyboard; after a click it is play/pause again
       case ' ': if ((tag === 'BUTTON' || tag === 'SUMMARY') && keyboardNav) { used = false; break; } setPlaying(!state.playing); break;
-      case ',': stepTime(-1); break;
-      case '.': stepTime(1); break;
       case '[': stepSpeed(-1); break;
       case ']': stepSpeed(1); break;
-      case 'r': case 'R': state.dir = -state.dir; break;
+      case 'r': case 'R': setReverse(state.dir > 0); break;
+      case 'h': case 'H': hud.toggle(true); break;
       case 'n': case 'N': setTime(Date.now()); break;
       case 't': case 'T': setScale(scale.s < 0.5 ? 1 : 0); break;
       case 'Escape':
-        if (!document.querySelector('.sheet:not([hidden])')) {
-          camera.fov = DEFAULT_FOV; camera.updateProjectionMatrix();
-          select('Sun', false);
-          view.setFocus('Sun', disp, { dist: systemDistance() });
-        }
-        closeSheets(); break;
+        // an open sheet first, then the settings, then back to the whole system
+        if (openSheetEl()) { closeSheets(); break; }
+        if (panel === 'settings') { setPanel(beforeSettings); break; }
+        camera.fov = DEFAULT_FOV; camera.updateProjectionMatrix();
+        select('Sun', false);
+        view.setFocus('Sun', disp, { dist: systemDistance() });
+        break;
       default: used = false;
     }
     if (used) { e.preventDefault(); hudDirty = true; }
@@ -912,6 +963,7 @@ function wire() {
     renderer.setSize(W, H, false);
     camera.aspect = W / H; camera.updateProjectionMatrix();
     hudBoxes = null;
+    placeSheet();
     wake();
   };
   new ResizeObserver(resize).observe(stage);
@@ -922,10 +974,32 @@ function wire() {
   new ResizeObserver(() => { $('app').style.setProperty('--ctl-h', ctl.offsetHeight + 'px'); hudBoxes = null; }).observe(ctl);
   // and the part of the screen the panels leave free changes with them
   new ResizeObserver(() => { hudBoxes = null; wake(); }).observe($('info'));
+  // the panels above the information panel, and the bodies heading the clock must keep clear of on phones
+  const layout = new ResizeObserver(layoutPanels);
+  for (const el of [stage, document.querySelector('header.time'), $('right'), $('bodiesBar')]) layout.observe(el);
+}
+
+// The information panel keeps at least the same gap to the panels above it (the clock and the
+// bodies panel, where they lie over it) as to those below: --info-top is how far down they reach,
+// and the panel's height is capped by it (style.css), so it scrolls inside rather than closing in.
+function layoutPanels() {
+  const app = $('app'), info = $('info').getBoundingClientRect();
+  let top = 0;
+  for (const el of [document.querySelector('header.time'), $('right')]) {
+    const r = el.getBoundingClientRect();
+    if (r.height && r.right > info.left && r.left < info.right) top = Math.max(top, r.bottom);
+  }
+  app.style.setProperty('--info-top', Math.ceil(top) + 'px');
+  app.style.setProperty('--tb-w', Math.ceil($('bodiesBar').getBoundingClientRect().width) + 'px');
 }
 
 // ---------------------------------------------------------------- start
+const hud = new HudVisibility($('app'), $('hudHint'), hidden => {
+  if (hidden) closeSheets();
+  hudBoxes = null; wake();
+});
 buildList();
+setPanel(bodiesOpen ? 'bodies' : null);
 wire();
 setTimeMode(timeMode);
 const fromUrl = readUrl();

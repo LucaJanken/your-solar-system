@@ -17,7 +17,7 @@ export const BODIES = [
   {
     name: 'Sun', type: 'Star · G2V', parent: null, color: '#ffd68a',
     shape: [695700, 695700, 695700], massKg: 1.9885e30,
-    rotationH: 609.12, rotationNote: 'at the equator; near the poles it takes ~35 days',
+    rotationH: 609.12, rotationNote: 'equator', polarRotationD: 35,
     representative: 'sunspots and faculae are not shown',
     desc: 'An ordinary middle-aged star, 4.6 billion years old, holding 99.86% of the Solar System’s mass. Its light takes 8 min 20 s to reach Earth.',
   },
@@ -110,7 +110,7 @@ export const BODIES = [
     name: 'Saturn', type: 'Gas giant', parent: 'Sun', color: '#e0c9a0',
     shape: [60268, 60268, 54364], massKg: 5.6834e26,
     periodD: 10759.22, rotationH: 10.561, solarDayH: 10.562, obliquity: 26.73,
-    rotationNote: 'deep interior, measured by ring seismology in 2019',
+    rotationNote: 'from ring seismology',
     tex: { map: 'saturn.jpg' },
     rings: {
       tex: 'saturn_rings.png', innerKm: 70426, outerKm: 141127,

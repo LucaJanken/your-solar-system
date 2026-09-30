@@ -73,14 +73,17 @@ export function fmtDuration(sec) {
   return (a / 86400 / 365.25).toFixed(2) + ' years';
 }
 
+// The simulation speed: a multiple of real time up to 60×, then simulated time per real second
+// ("5 min/s", "2 d/s", "1 yr/s"); a leading − when time runs backward. One decimal below 10.
 export function fmtRate(r) {
   const s = r < 0 ? '−' : '', a = Math.abs(r);
-  const u = x => a < x * 0.9995;
-  if (u(60)) return s + a.toFixed(a < 10 ? 1 : 0) + '× real time';
-  if (u(3600)) return s + (a / 60).toFixed(1) + ' min / s';
-  if (u(86400)) return s + (a / 3600).toFixed(1) + ' h / s';
-  if (u(86400 * 60)) return s + (a / 86400).toFixed(a < 86400 * 10 ? 2 : 1) + (a < 86400 * 1.0005 ? ' day / s' : ' days / s');
-  return s + (a / 31557600).toFixed(2) + ' years / s';
+  const n = x => x < 9.95 ? String(+x.toFixed(1)) : String(Math.round(x));
+  // each unit until its value would round to the next unit's 1
+  if (a < 59.5) return s + n(a) + '×';
+  if (a < 60 * 59.5) return s + n(a / 60) + ' min/s';
+  if (a < 3600 * 23.5) return s + n(a / 3600) + ' h/s';
+  if (a < 86400 * 364.5) return s + n(a / 86400) + ' d/s';
+  return s + n(a / 31557600) + ' yr/s';
 }
 
 export function fmtDist(km) {

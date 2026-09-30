@@ -15,7 +15,7 @@ Everything on screen is computed for the displayed instant rather than animated 
 - **The sky behind.** 9,096 stars from the Yale Bright Star Catalogue, moved by their proper motion,
   over the Milky Way.
 - **True scale to overview.** It opens at true scale, with the whole system out to Neptune's orbit
-  in view; a slider morphs to a compressed overview where every body is visible, without ever
+  in view; the Scale slider in the settings morphs to a compressed overview where every body is visible, without ever
   distorting directions.
 
 Plain HTML, CSS and JavaScript modules: no build step, no framework, no dependencies to install.
@@ -23,35 +23,60 @@ GitHub Pages serves the repository as-is.
 
 ## Using it
 
-- Time starts at the present, running at real time. The speed slider is signed and logarithmic:
-  right runs forward, left backward, from real time next to the centre to years per second at the
-  ends; the notch in the middle stops time (the rate reads 0×). Play/Pause keeps the chosen speed
-  (shown dimmed while paused), and `R` reverses it. ◂ ▸ (or `,` `.`) step by an hour, a day, a
-  calendar month or a calendar year; tapping the step between them changes it (remembered).
+- The top-right corner holds one narrow panel. Its heading has three tabs, each an icon above its
+  name (a ringed planet, a gear, a question mark): Bodies and Settings show their content in the
+  panel, and choosing the one shown folds the panel; Guide opens the Guide. On computers the list
+  stays as it was left (remembered); on phones the panel starts folded and folds again when the view
+  is tapped. Esc closes the settings. On phones the tabs show only their icons, and the panel is only
+  as wide as they are, so the clock beside it keeps its room.
+- The Guide and the eclipses list close again from their own button, with a click or tap outside
+  them, or with Esc. They open in the space the panels leave free, so they cover none of them: beside
+  the panels, or else between those at the top and at the bottom; where even that is too small
+  (phones, tablets held upright) the bodies panel and the information panel fold while one is open,
+  and open again when it closes.
+- Below 960 px wide (phones, and tablets held upright: iPad mini to iPad Pro 11") or 480 px tall,
+  the compact phone layout is used ("on phones" in this list), as the information panel and the
+  time controls no longer fit side by side.
+- The settings switch Orbits, Labels, Moons, Stars (the stars and the Milky Way), Lock and Axis,
+  and hold the Scale slider (True, i.e. true scale, on the left, the overview on the right).
+- The bottom bar: a round Play/Pause button, a reverse button (a clock with a circular arrow, lit
+  while time runs backward; `R`), the speed slider, the calendar, Eclipses & transits and Now. The
+  slider is logarithmic and forward-only, from real time on the left to about 5 years per second on
+  the right; `[` `]` move it a step. A caption above it reads SPEED and the value: a multiple of
+  real time up to 60× (`1×`, `10×`), then time per second (`5 min/s`, `2 d/s`, `1 yr/s`), with a −
+  when reversed; paused, it is dimmed and Play resumes at it. On phones the slider has a row of
+  its own.
+- The eye beside the clock's time zone, or `H`, hides the whole interface; a hint says for 3 s how to bring it back: a click
+  or tap on empty space (or `H`). Drags, pinches and clicks on bodies or labels keep turning the view
+  and choosing bodies without bringing it back. The hidden state is not remembered.
 - The calendar button goes to a date: on phones through the system's own picker (confirming there
-  applies it), on computers through a small popover with Go (or Enter; Esc closes it).
+  applies it), on computers through a small popover with Set (or Enter; Esc closes it).
 - Eclipses & transits lists solar and lunar eclipses and transits of Mercury and Venus, opening at
   the displayed date and loading more as it is scrolled either way (searched in a worker). The kinds
   shown can be switched off and on (remembered); choosing an event goes there.
-- The clock shows Local time, UTC, or Scientific (UTC with UT, TT, ΔT and the Julian Date); the
+- The clock shows Local time, UTC, or Scientific (UT, with TT, ΔT and the Julian Date); the
   choice is remembered. An Extrapolated tag appears outside the validated 1800–2050.
 - Selecting a body glides the camera over to it without changing zoom or viewing angle (it only
   backs off if it would end up inside the body). Selecting it again flies in to a comfortable view
   of its lit side; a third time flies back out. Lock keeps the camera travelling with the
-  selected body; locking again after drifting catches up with it. Axis shows its rotation axis.
+  selected body; locking again after drifting catches up with it. Axis shows its spin axis.
 - Dragging (one finger) turns the view around the focus; scroll or pinch zooms. Moving the view
   sideways (right- or shift-drag, arrow keys, two-finger drag) also works locked: the camera keeps
-  following the body from there. A two-finger gesture either pinches or drags, never both. The phone
-  menu stays open while bodies are picked from it; a planet's moon count opens its moons in the
-  list. The information panel starts folded down to the body's name: tapping it opens it, and
-  its – button folds it again.
-- The view state, including time, speed and direction, is kept in the URL by Share view
-  (`#t=…&speed=…&dir=-1…`; links without `dir` run forward).
+  following the body from there. A two-finger gesture either pinches or drags, never both. A
+  planet's arrow, right beside its name, opens its moons in the list, and they stay listed until
+  the arrow closes them; the moons that selecting a body lists close again when a body of another
+  system is selected, so going through the planets leaves only the current one open. The information panel
+  starts folded down to the body's name: tapping it opens it, and its – button folds it again. It
+  never comes closer to the panels above it than to the bottom bar (or edge) below it: it scrolls
+  inside instead.
+- A view given in the URL hash (`#t=…&focus=…&sel=…&scale=…&speed=…&dir=-1&play=0&cam=…`), as
+  links from the former Share view carry it, is still read on load; `dir=-1` turns on reverse. The
+  page no longer writes one.
 - The Guide shows the essential controls and keyboard shortcuts first (the shortcuts are hidden on
   touchscreens); the details (more controls, scale, shadows, accuracy, what the picture shows,
   sources) are folded into sections below. The Extrapolated tag opens it at the accuracy section.
-- A small Support link under the view options opens a note with the Ko-fi link, the author and the
-  source repository.
+- The Guide ends with a line on support: the site is free, without ads or an account, and a Ko-fi
+  link.
 
 To run it locally, serve the repository root over HTTP (ES modules and the events worker do not load
 from `file://`), e.g. `python3 -m http.server`, and open `http://localhost:8000/`.
@@ -78,7 +103,8 @@ js/scene/       three.js rendering
   stars.js        Yale Bright Star Catalogue with proper motion, over the Milky Way
   view.js         camera, floating origin, focus glides, lock
   labels.js       labels
-js/ui/          information panel and formatting
+js/ui/          info.js: information panel; hud.js: hiding the interface, telling taps from
+                drags; format.js: numbers, dates and the speed readout
 js/main.js      state, main loop, controls
 vendor/         three.js r186 (+ OrbitControls) and astronomy-engine 2.1.19, minified ES modules
 data/stars.bin  9,096 BSC5 stars: RA, Dec, V, B−V, proper motion (int16 each)

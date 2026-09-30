@@ -33,45 +33,54 @@
     <div class="time-head">
       <button type="button" class="chip mode" id="timeMode" title="Switch the clock between local time, UTC and scientific time scales">Local</button>
       <span class="kicker" id="tzLabel"></span>
+      <button type="button" class="chip icon-chip" id="hideBtn" aria-label="Hide the interface"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8S4 3.6 8 3.6 14.5 8 14.5 8 12 12.4 8 12.4 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/><path d="M2.6 13.4 13.4 2.6"/></svg></button>
       <button type="button" class="chip warn" id="badge" hidden title="Outside 1800–2050 the positions are extrapolated. Click for details.">Extrapolated</button>
     </div>
     <div class="clock" id="clock">--:--:--</div>
     <div class="date-row"><span class="date" id="date">loading…</span></div>
     <div class="time-details" id="timeDetails" hidden>
-      <span title="Universal Time, UT1: Earth's rotation angle as a time">UT</span><span id="tdUT"></span>
       <span title="Terrestrial Time: the uniform time of the ephemeris">TT</span><span id="tdTT"></span>
       <span title="TT − UT: how far Earth's rotation lags a uniform clock">ΔT</span><span id="tdDT"></span>
       <span title="Julian Date in TT">JD (TT)</span><span id="tdJD"></span>
     </div>
   </header>
 
-  <button type="button" class="btn menu-btn" id="menuBtn" aria-expanded="false" aria-controls="right">Menu</button>
   <div class="right" id="right">
-    <nav class="panel bodies" data-hud aria-label="Bodies">
-      <h2>Bodies</h2>
-      <ul id="bodyList"></ul>
-    </nav>
-    <section class="panel view" data-hud aria-label="View options">
-      <h2>View</h2>
-      <button type="button" class="tog" data-toggle="orbits" aria-pressed="true">Orbits</button>
-      <button type="button" class="tog" data-toggle="labels" aria-pressed="true">Labels</button>
-      <button type="button" class="tog" data-toggle="moons" aria-pressed="true">Moons</button>
-      <button type="button" class="tog" data-toggle="stars" aria-pressed="true">Stars</button>
-      <button type="button" class="tog" data-toggle="lock" aria-pressed="true" title="Lock the camera to the selected body, so it travels with it.">Lock</button>
-      <button type="button" class="tog" data-toggle="axis" aria-pressed="true" title="Show the selected body's rotation axis">Axis</button>
-      <div class="scale-box">
-        <div class="scale-ends"><button type="button" id="scaleMin">Overview</button><button type="button" id="scaleMax">True scale</button></div>
-        <input type="range" id="scale" min="0" max="1" step="0.001" value="1" aria-label="Display scale, from overview to true scale">
+    <!-- one panel: two tabs in its heading show the list of bodies or the settings (the one shown
+         folds the panel), and ? opens the guide -->
+    <div class="panel bodies" id="bodies" data-hud>
+      <div class="bodies-bar" id="bodiesBar">
+        <!-- each tab's icon above its name; on phones only the icons, leaving the clock room -->
+        <button type="button" class="tab" id="bodiesTab" aria-label="Bodies" aria-expanded="true" aria-controls="bodyList">
+          <svg class="tab-ic" width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="4.3"/><path d="M11.91 4.42A7.4 2.5 -22 1 1 2.7 8.14"/></svg><span class="tab-tx">Bodies</span>
+        </button>
+        <button type="button" class="tab" id="settingsTab" aria-label="Settings" aria-expanded="false" aria-controls="settings">
+          <svg class="tab-ic" width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.73 3.27 7.04 1.57h1.92l.31 1.7 1.18.49 1.42-.99 1.36 1.36-.99 1.42.49 1.18 1.7.31v1.92l-1.7.31-.49 1.18.99 1.42-1.36 1.36-1.42-.99-1.18.49-.31 1.7H7.04l-.31-1.7-1.18-.49-1.42.99-1.36-1.36.99-1.42-.49-1.18-1.7-.31V7.04l1.7-.31.49-1.18-.99-1.42 1.36-1.36 1.42.99z"/><circle cx="8" cy="8" r="2"/></svg><span class="tab-tx">Settings</span>
+        </button>
+        <button type="button" class="tab" id="guideBtn" aria-label="Guide" aria-expanded="false" aria-controls="guide">
+          <svg class="tab-ic" width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.3"/><path d="M6.1 6.3a1.95 1.95 0 1 1 2.6 1.8c-.5.2-.7.6-.7 1.1v.5"/><path d="M8 11.6v.05" stroke-width="1.7"/></svg><span class="tab-tx">Guide</span>
+        </button>
       </div>
-      <button type="button" class="act wide" id="eventsBtn">Eclipses &amp; transits ▸</button>
-      <button type="button" class="act" id="guideBtn">Guide</button>
-      <button type="button" class="act" id="shareBtn">Share view</button>
-      <button type="button" class="support-btn wide" id="supportBtn" aria-haspopup="dialog">♥ Support</button>
-    </section>
+      <ul id="bodyList" aria-label="Bodies"></ul>
+      <!-- the Settings tab shows them here, in place of the list -->
+      <section class="settings" id="settings" hidden aria-label="Settings">
+        <h2>View</h2>
+        <button type="button" class="sw" role="switch" data-toggle="orbits" aria-checked="true">Orbits<i></i></button>
+        <button type="button" class="sw" role="switch" data-toggle="labels" aria-checked="true">Labels<i></i></button>
+        <button type="button" class="sw" role="switch" data-toggle="moons" aria-checked="true">Moons<i></i></button>
+        <button type="button" class="sw" role="switch" data-toggle="stars" aria-checked="true">Stars<i></i></button>
+        <button type="button" class="sw" role="switch" data-toggle="lock" aria-checked="true" title="Lock the camera to the selected body, so it travels with it">Lock<i></i></button>
+        <button type="button" class="sw" role="switch" data-toggle="axis" aria-checked="true" title="Show the selected body's rotation axis">Axis<i></i></button>
+        <h2 class="scale-title" id="scaleTitle">Scale</h2>
+        <!-- true scale on the left, the overview on the right (the input's value is 1 − scale) -->
+        <input type="range" id="scale" min="0" max="1" step="0.001" value="0" aria-labelledby="scaleTitle">
+        <div class="scale-ends"><button type="button" id="scaleMax">True</button><button type="button" id="scaleMin">Overview</button></div>
+      </section>
+    </div>
   </div>
 
   <section class="panel info" id="info" data-hud aria-label="Selected body">
-    <div class="info-head"><div class="info-name" id="infoName" aria-live="polite">Sun</div><div class="info-type" id="infoType"></div><button type="button" class="info-min" id="infoMin" aria-expanded="true" aria-controls="infoBody" title="Hide the details">–</button></div>
+    <div class="info-head"><div class="info-name" id="infoName" aria-live="polite">Sun</div><div class="info-type" id="infoType"></div><button type="button" class="info-min" id="infoMin" aria-expanded="true" aria-controls="infoBody"></button></div>
     <div class="info-body" id="infoBody">
     <p class="info-desc" id="infoDesc"></p>
     <dl class="facts" id="facts"></dl>
@@ -81,35 +90,31 @@
   </section>
 
   <section class="panel timectl" data-hud aria-label="Time controls">
-    <div class="row ctl-row">
-      <button type="button" class="btn primary" id="playBtn" title="Play / pause (space)">Pause</button>
-      <div class="when">
-        <button type="button" class="btn icon" id="whenBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="whenForm" title="Go to a date" aria-label="Go to a date">
-          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1.5" y="2.5" width="13" height="12" rx="1.5"/><path d="M1.5 6.5h13M5 1v3.2M11 1v3.2"/></svg>
-        </button>
-        <!-- On phones the date input lies invisibly over the calendar button, so a tap opens the
-             system's own picker; on computers the button opens this as a popover with a Go button. -->
-        <form class="when-pop" id="whenForm">
-          <input type="datetime-local" id="when" step="60" min="1000-01-01T00:00" max="2999-12-31T23:59" aria-label="Date and time (local)">
-          <button type="submit" class="btn primary" id="whenOk" title="Go to this date (Enter)">Go</button>
-        </form>
-      </div>
-      <div class="stepper" role="group" aria-label="Step through time">
-        <button type="button" class="btn" id="backBtn">◂</button>
-        <button type="button" class="btn" id="stepBtn" title="Step size: click to change">1 d</button>
-        <button type="button" class="btn" id="fwdBtn">▸</button>
-      </div>
-      <button type="button" class="btn" id="nowBtn" title="Jump to the present (N)">Now</button>
-    </div>
+    <button type="button" class="round" id="playBtn" title="Play / pause (Space)" aria-label="Play">
+      <svg class="i-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.2 3.2v9.6l7.4-4.8z" fill="currentColor" stroke="none"/></svg>
+      <svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.3 3.5v9M10.7 3.5v9" stroke-width="2.4"/></svg>
+    </button>
+    <button type="button" class="round" id="revBtn" aria-pressed="false" aria-label="Run time backward">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 9.1a5.6 5.6 0 1 0 1.2-4.6"/><path d="M3.4 1.9v2.9h2.9"/><path d="M8 5.2V8l2 1.4"/></svg>
+    </button>
+    <!-- the speed slider under its caption: what it is, and what it is set to -->
     <div class="speed-box">
-      <div class="row">
-        <button type="button" class="btn" id="slowBtn" aria-label="One step toward backward ( [ )" title="One step toward backward ( [ )">−</button>
-        <input type="range" id="speed" min="-8.9" max="8.9" step="0.01" aria-label="Simulation speed: left runs time backwards, right forwards, the middle stops it">
-        <button type="button" class="btn" id="fastBtn" aria-label="One step toward forward ( ] )" title="One step toward forward ( ] )">+</button>
-      </div>
-      <!-- the speed the slider is set to, between its two directions -->
-      <div class="speed-ends"><span aria-hidden="true">◂<span class="w"> backward</span></span><span class="rate" id="rate" aria-live="off"></span><span aria-hidden="true"><span class="w">forward </span>▸</span></div>
+      <div class="speed-cap"><span class="kicker" aria-hidden="true">Speed</span><span class="rate" id="rate" aria-live="off"></span></div>
+      <input type="range" id="speed" min="0" max="8.2" step="0.01" aria-label="Simulation speed, from real time to years per second">
     </div>
+    <div class="when">
+      <button type="button" class="btn icon" id="whenBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="whenForm" title="Go to a date" aria-label="Go to a date">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1.5" y="2.5" width="13" height="12" rx="1.5"/><path d="M1.5 6.5h13M5 1v3.2M11 1v3.2"/></svg>
+      </button>
+      <!-- On phones the date input lies invisibly over the calendar button, so a tap opens the
+           system's own picker; on computers the button opens this as a popover with a Set button. -->
+      <form class="when-pop" id="whenForm">
+        <input type="datetime-local" id="when" step="60" min="1000-01-01T00:00" max="2999-12-31T23:59" aria-label="Date and time (local)">
+        <button type="submit" class="btn primary" id="whenOk">Set</button>
+      </form>
+    </div>
+    <button type="button" class="btn icon" id="eventsBtn" aria-expanded="false" aria-controls="events" aria-label="Eclipses and transits"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><circle cx="10" cy="6.9" r="4.1" fill="currentColor" stroke="none"/></svg></button>
+    <button type="button" class="btn" id="nowBtn" title="Jump to the present (N)">Now</button>
   </section>
 
   <div class="sheet" id="events" hidden role="dialog" aria-labelledby="evTitle">
@@ -137,19 +142,20 @@
     <h3>Getting around</h3>
     <ul class="basics">
       <li><b>Look around.</b> Drag to turn the view; scroll or pinch to zoom; right-drag or drag with two fingers to move it sideways.</li>
-      <li><b>Visit a body.</b> Click it, its label or its name in the list, and the camera glides over. Choose it again to fly in close, and a third time to fly back out. If you have moved the view sideways, choosing it again first brings it back to the centre. The number beside a planet lists its moons.</li>
-      <li><b>Run time.</b> The speed slider runs time forward to the right and backward to the left, faster toward the ends. The notch in the middle stops it.</li>
-      <li><b>Jump in time.</b> ◂ and ▸ step by an hour, a day, a month or a year (tap the step between them to change it). The calendar button goes to any date from 1000 to 2999, and <b>Now</b> comes back to the present.</li>
-      <li><b>Eclipses &amp; transits</b> lists past and coming events. Choose one to watch it.</li>
-      <li><b>Share view</b> copies a link to exactly what you see.</li>
+      <li><b>Visit a body.</b> Click it, its label or its name in the <b>Bodies</b> list, and the camera glides over. Choose it again to fly in close, and a third time to fly back out. If you have moved the view sideways, choosing it again first brings it back to the centre. The arrow beside a planet lists its moons; choosing the <b>Bodies</b> tab again folds the list away. On phones and upright tablets the tabs show only their icons: a ringed planet for Bodies, a gear for Settings and a question mark for the Guide.</li>
+      <li><b>Run time.</b> The round button plays and pauses time. The speed slider beside it runs from real time on the left to years per second on the right, and the clock with the circular arrow runs time backward.</li>
+      <li><b>Jump in time.</b> The calendar button goes to any date from 1000 to 2999, and <b>Now</b> comes back to the present.</li>
+      <li><b>Eclipses and transits</b>, the button between the calendar and Now, lists past and coming events. Choose one to watch it.</li>
+      <li><b>Settings</b>, the tab beside Bodies, turn orbits, labels, moons, the stars and the Milky Way, and the rotation axis on and off, set <b>Lock</b>, and hold the <b>Scale</b> slider, from true scale to an overview.</li>
+      <li><b>Hide the interface</b> with the eye beside the clock’s time zone to see only the sky; click or tap empty space to bring it back. Turning, zooming and choosing bodies keep working meanwhile.</li>
     </ul>
     <dl class="keys">
       <dt><kbd>Space</kbd></dt><dd>play / pause</dd>
-      <dt><kbd>,</kbd> <kbd>.</kbd></dt><dd>one step back / forward</dd>
       <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>slower / faster (the speed slider one step)</dd>
       <dt><kbd>R</kbd></dt><dd>reverse time</dd>
       <dt><kbd>N</kbd></dt><dd>now</dd>
       <dt><kbd>T</kbd></dt><dd>overview ↔ true scale</dd>
+      <dt><kbd>H</kbd></dt><dd>hide / show the interface</dd>
       <dt><kbd>Esc</kbd></dt><dd>back to the whole system</dd>
     </dl>
 
@@ -158,18 +164,17 @@
       <summary>More about the controls</summary>
       <ul>
         <li>The camera glides to a body without changing your zoom or viewing angle (it only backs off if it would end up inside the body). Flying in close turns it toward the sunlit side if you were looking at the night side.</li>
-        <li><b>Lock</b> keeps the camera travelling with the selected body. Unlock it to let the body drift away, and lock again to catch up with it. Right-drag, shift-drag, the arrow keys or a two-finger drag move the view sideways; locked, the camera keeps following the body from there.</li>
-        <li>The speed slider runs from real time next to the middle to years per second at the ends. <b>Play</b> and <b>Pause</b> keep the chosen speed: paused, the speed is shown dimmed; in the middle notch it reads 0×. <b>−</b> and <b>+</b> move the slider one step.</li>
-        <li>Stepping by days, months or years keeps the time of day, so Earth turns the same face to the Sun.</li>
-        <li>The calendar takes dates in the time the clock shows (local or UTC). On a phone it opens the phone’s own date picker; on a computer type or pick a date and press <b>Go</b> (or <kbd>Enter</kbd>).</li>
-        <li>The button above the clock switches between <b>Local</b> time, <b>UTC</b> and <b>Scientific</b>, which adds the astronomical time scales: UT (Earth’s rotation, UT1), TT (the uniform time the planets move by), ΔT = TT − UT and the Julian Date. The model takes UTC to be UT1; the two never differ by more than 0.9 s.</li>
-        <li>The information panel starts folded down to the body’s name: tap it (or <b>+</b>) to open it, and <b>–</b> folds it again. On a phone, tap an open panel to show all of its data.</li>
+        <li><b>Lock</b> (in the settings) keeps the camera travelling with the selected body. Unlock it to let the body drift away, and lock again to catch up with it. Right-drag, shift-drag, the arrow keys or a two-finger drag move the view sideways; locked, the camera keeps following the body from there.</li>
+        <li>The speed slider runs from real time (1×) at its left end to about five years per second at its right. Up to 60× the speed is shown as a multiple of real time, faster as simulated time per second (“5 min/s”, “2 d/s”, “1 yr/s”). <b>Play</b> and <b>Pause</b> keep the chosen speed: paused, it is shown dimmed. Running backward keeps the speed too, and marks it with a −.</li>
+        <li>The calendar takes dates in the time the clock shows (local or UTC). On a phone it opens the phone’s own date picker; on a computer type or pick a date and press <b>Set</b> (or <kbd>Enter</kbd>).</li>
+        <li>The button above the clock switches between <b>Local</b> time, <b>UTC</b> and <b>Scientific</b>, which shows Universal Time (UT, Earth’s rotation, UT1) and adds TT (the uniform time the planets move by), ΔT = TT − UT and the Julian Date. The model takes UTC to be UT1; the two never differ by more than 0.9 s.</li>
+        <li>The information panel starts folded down to the body’s name: tap it (or <b>+</b>) to open it, and <b>–</b> folds it again. On a phone or an upright tablet, tap an open panel to show all of its data.</li>
       </ul>
     </details>
 
     <details>
       <summary>Overview and true scale</summary>
-      <p>At <b>true scale</b> the Solar System is almost entirely empty: if the Sun were a grapefruit, Earth would be a grain of sand 13 m away and Neptune 390 m away. This is how the model opens. The <b>overview</b> shrinks distances and enlarges bodies so everything fits on one screen, and the slider morphs smoothly between the two. Directions are never distorted, so alignments such as eclipses and conjunctions look right at every setting. Bodies too small to see are marked by their labels; hovering over one circles it.</p>
+      <p>At <b>true scale</b> the Solar System is almost entirely empty: if the Sun were a grapefruit, Earth would be a grain of sand 13 m away and Neptune 390 m away. This is how the model opens. The <b>overview</b> shrinks distances and enlarges bodies so everything fits on one screen, and the <b>Scale</b> slider in the settings morphs smoothly between the two, from true scale on the left to the overview on the right. Directions are never distorted, so alignments such as eclipses and conjunctions look right at every setting. Bodies too small to see are marked by their labels; hovering over one circles it.</p>
     </details>
 
     <details>
@@ -224,20 +229,13 @@
         <li>Io, Ganymede, Callisto, Europa, Phobos: USGS Astrogeology / NASA / JPL Voyager and Galileo global mosaics (public domain); Callisto’s patchwork look is the uneven coverage of those missions. Pluto: NASA / JHUAPL / SwRI, New Horizons (public domain). Charon: USGS Astrogeology New Horizons LORRI/MVIC global mosaic; Triton: USGS Astrogeology Voyager 2 global color mosaic (both public domain). Mimas, Enceladus, Tethys, Dione, Rhea, Iapetus: Cassini global color maps, 2014 (NASA/JPL-Caltech/Space Science Institute/Lunar and Planetary Institute), shown in their brightness only, tinted with each moon’s overall colour, as their colours were enhanced.</li>
         <li>Rendering: <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> (MIT). Fonts: IBM Plex (OFL).</li>
       </ul>
-      <p>The source code is on <a href="https://github.com/LucaJanken/your-solar-system" target="_blank" rel="noopener">GitHub</a>.</p>
+      <p>Made by Luca Janken. The source code is on <a href="https://github.com/LucaJanken/your-solar-system" target="_blank" rel="noopener">GitHub</a>.</p>
     </details>
-  </div>
-
-  <div class="sheet narrow" id="support" hidden role="dialog" aria-labelledby="supportTitle">
-    <button type="button" class="close" data-close>Close</button>
-    <h2 id="supportTitle">Support</h2>
-    <p>Your Solar System is free to use, with no ads and no account.</p>
-    <p>If you enjoy it or find it useful, you can support it by buying me a coffee. It helps keep the site running, and free of ads.</p>
-    <a class="btn primary kofi" href="https://ko-fi.com/lucajanken" target="_blank" rel="noopener">Buy me a coffee on Ko-fi</a>
-    <p class="byline">Made by Luca Janken · <a href="https://github.com/LucaJanken/your-solar-system" target="_blank" rel="noopener">source on GitHub</a></p>
+    <p class="guide-foot">This is free, with no ads and no account needed. If it's useful to you, you can <a href="https://ko-fi.com/lucajanken" target="_blank" rel="noopener">buy me a coffee ☕</a>.</p>
   </div>
 
   <div id="toast" role="status"></div>
+  <div id="hudHint" role="status"></div>
 </div>
 <script type="module" src="js/main.js"></script>
 </body>
