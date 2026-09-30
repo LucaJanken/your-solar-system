@@ -60,7 +60,9 @@ const stars = new Stars();
 const glare = new SunGlare();
 const view = new View(camera, renderer.domElement);
 const info = new InfoPanel();
-const labels = new Labels($('labels'), BODIES, name => select(name, true), () => updateHover());
+// a clicked label chooses its body, unless a body's dot is right under the pointer (see bodyAt); a
+// label pressed from the keyboard (no pointer, detail 0) always chooses its own
+const labels = new Labels($('labels'), BODIES, (name, e) => select(e.detail && bodyAt(e.clientX, e.clientY, true) || name, true), () => updateHover());
 
 // ---------------------------------------------------------------- display positions
 let snap = null, snapMs = NaN, disp = {};
@@ -104,6 +106,14 @@ function systemDistance() {
   const tanY = tanV * Math.min(H, free.bottom - free.top) / H;
   // the near side of the orbit is the farthest up or down the screen
   return Math.max(R / tanX, R * Math.cos(SYSTEM_ELEV) + R * Math.sin(SYSTEM_ELEV) / tanY);
+}
+// The overview's viewing direction: from the side the camera is on now, at SYSTEM_ELEV above the
+// ecliptic, for which systemDistance is fitted (from a close look at a planet's lit side the camera
+// is often nearly in the ecliptic, and the orbits would be seen edge-on).
+function systemDir() {
+  const c = camera.position.clone().sub(view.controls.target).setY(0);
+  if (c.lengthSq() < 1e-24) return SYSTEM_DIR.clone();
+  return c.normalize().multiplyScalar(Math.cos(SYSTEM_ELEV)).setY(Math.sin(SYSTEM_ELEV));
 }
 // largest drawn radius (equatorial, for flattened planets)
 const drawnExtent = name => { const d = BY_NAME[name]; return drawnRadius(name) * Math.max(...d.shape) / meanRadius(d); };
@@ -186,27 +196,59 @@ function select(name, fly) {
     // chosen again after the view was moved sideways off it: back to the centre first, at the same zoom
     if (again && view.focus === name && !view.centred()) view.glide({ minDist: R * 1.2, safeDist: R * 3 });
     else if (again) closeLook(name);
-    // otherwise only the target moves; zoom and angle stay the user's, unless the camera would be inside the body
-    else view.setFocus(name, disp, { minDist: R * 1.2, safeDist: R * 3 });
-  }
+    else {
+      // otherwise only the target moves; zoom and angle stay the user's, unless the camera would be inside the body
+      view.setFocus(name, disp, { minDist: R * 1.2, safeDist: R * 3 });
+      // the view on arrival is the one a close look returns to; moving on from a close look to a
+      // body that is then about as close (Earth to Venus, Io to Jupiter) stays in it, with the way
+      // back it had, but not to one still far off (Jupiter to Io: that one's close look is next)
+      const arrival = aimedView();
+      if (!closeUp.close || arrival.dist > closeDistance(name) * 2) closeUp = { back: arrival, close: false };
+    }
+  } else closeUp = { back: null, close: false };
   bodies.setAxis(name);
   hudDirty = true;
 }
 
-// Choosing the selected body again flies in to a comfortable view of it, from its lit side; once
-// there, choosing it again flies back out to where the camera was before (or to the distance of the
-// whole system, if that was about as close).
-let zoomBack = null;   // { name, dist }: the distance to return to
+// Choosing the selected body again flies in to a comfortable view of it, from its lit side; choosing
+// it once more, while still that close, flies back out to where the camera was when the flight in
+// began, at that distance and from that side (if it was already about as close, zoomed in by hand,
+// to where it was when the body was chosen). Zoomed out by hand from the close look, choosing it
+// flies in again, and the way back is then to where it was zoomed out to. Choosing another body
+// nearby during the close look keeps the way back. Distances are judged by where the camera is
+// heading, so that choosing the body again during either flight turns it round, and the way back
+// stays the one from before the first flight in.
+let closeUp = { back: null, close: false };   // back: { dist, dir } | null; close: flown in since
+const aimedView = () => {
+  const tw = view.tween;
+  return tw ? { dist: tw.toDist, dir: tw.toDir || camDir() } : { dist: view.distance() * Math.exp(view.zoomLeft), dir: camDir() };
+};
+const camDir = () => camera.position.clone().sub(view.controls.target).normalize();
 function closeLook(name) {
-  const close = closeDistance(name), d = view.distance();
-  if (view.focus === name && d < close * 1.5) {
-    const back = zoomBack && zoomBack.name === name && zoomBack.dist > close * 2 ? zoomBack.dist : Math.max(systemDistance(), close * 4);
-    zoomBack = null;
-    view.setFocus(name, disp, { dist: back });
-  } else {
-    zoomBack = { name, dist: d };
-    view.setFocus(name, disp, { dist: close, dir: litSide(name) });
+  const close = closeDistance(name), now = aimedView(), prev = closeUp.back;
+  const far = v => v && v.dist > close * 1.1;
+  // in the close look (or nearer, zoomed in by hand): back out
+  if (closeUp.close && now.dist < close * 1.1) {
+    closeUp = { back: null, close: false };
+    view.setFocus(name, disp, far(prev) ? prev : neighbourhood(name));
+    return;
   }
+  // in, remembering where the camera is now; if it is already about as close (zoomed in by hand
+  // since the body was chosen), the view on arrival instead
+  closeUp = { back: far(now) ? now : far(prev) ? prev : neighbourhood(name), close: true };
+  view.setFocus(name, disp, { dist: close, dir: litSide(name) });
+}
+// where the way back out of a close look leads when there is no view to return to: the body's
+// surroundings, which for a moon are its planet and orbit, for a planet its moons, and for the Sun
+// the whole system (a moonless planet: 30 close-look distances, well clear of the body)
+function neighbourhood(name) {
+  const def = BY_NAME[name], close = closeDistance(name);
+  if (name === 'Sun') return { dist: systemDistance(), dir: systemDir() };
+  const span = (a, b) => Math.hypot(disp[a][0] - disp[b][0], disp[a][1] - disp[b][1], disp[a][2] - disp[b][2]);
+  let r = 0;
+  if (def.parent !== 'Sun') r = span(name, def.parent);
+  else for (const m of BODIES) if (m.parent === name) r = Math.max(r, span(m.name, name));
+  return { dist: r ? Math.max(3 * r, close * 4) : close * 30, dir: null };
 }
 
 // ---------------------------------------------------------------- scale changes
@@ -228,7 +270,7 @@ function applyScale(s) {
   if (f !== 'Sun' && cd < 12 * before.r) factor = drawnRadius(f) / before.r;
   else if (cd > before.n) factor = scale.helio(NEPTUNE_KM) / before.n;
   else factor = scale.helio(before.d) / cd;
-  if (Number.isFinite(factor) && factor > 0) { view.rescale(factor); if (zoomBack) zoomBack.dist *= factor; }
+  if (Number.isFinite(factor) && factor > 0) { view.rescale(factor); if (closeUp.back) closeUp.back.dist *= factor; }
   // the slider has true scale on the left
   $('scale').value = 1 - s;
   $('scale').setAttribute('aria-valuetext', s === 1 ? 'true scale' : s === 0 ? 'overview' : Math.round((1 - s) * 100) + '% toward the overview');
@@ -270,7 +312,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const elapsed = (now - last) / 1000, dt = Math.min(0.1, elapsed);
   last = now;
-  const active = state.playing || view.tween || scaleAnim || now < wakeUntil || viewShift !== shiftTarget;
+  const active = state.playing || view.tween || view.zoomLeft || scaleAnim || now < wakeUntil || viewShift !== shiftTarget;
   if (!active) {
     if (hudDirty) { lastHud = now; hudDirty = false; updateHud(); }
     return;
@@ -352,7 +394,8 @@ function frame(now) {
 
   const sunV = bodies.views.Sun;
   glare.update(camera, sunV.group.position, sunV.R, W, H, renderer.getPixelRatio(),
-    BODIES.filter(d => d.parent).map(d => { const v = bodies.views[d.name]; return { pos: v.group.position, R: v.R, visible: v.group.visible }; }));
+    BODIES.filter(d => d.parent).map(d => { const v = bodies.views[d.name]; return { pos: v.group.position, R: v.R, visible: v.group.visible }; }),
+    REDUCED_MOTION ? 0 : dt);
   stars.setGlare(glare.on ? 0.75 * glare.vis * glare.halo : 0, glare.dir);
 
   renderer.clear();
@@ -373,20 +416,27 @@ function moonSpread(e) {
 }
 
 // ---------------------------------------------------------------- picking and hover
-// the body whose drawn disc (or a generous halo around tiny ones) is under a screen point, nearest first
-function pick(x, y) {
-  let best = null;
+// The body a click, tap or hover at a screen point (client pixels) means: one whose drawn disc (or,
+// if tiny, its dot) is under it, the front one if several; else a label there; else the nearest body
+// within a generous halo. Dots come before labels because a label sits beside its own body and can
+// cover another's: from the overview, Mercury's covers Earth. With `dotsOnly`, only a disc or dot
+// counts (over a label, which then means its own body unless a dot is right under the pointer).
+function bodyAt(cx, cy, dotsOnly = false) {
+  const r = renderer.domElement.getBoundingClientRect(), x = cx - r.left, y = cy - r.top;
+  let on = null, near = null, nearD = Infinity;
   for (const s of screenPos) {
     if (!s.onScreen || !bodies.views[s.name].group.visible) continue;
-    const d = Math.hypot(s.px - x, s.py - y), reach = Math.max(s.rpx, 12);
-    if (d < reach && (!best || s.dist < best.dist)) best = s;
+    const d = Math.hypot(s.px - x, s.py - y);
+    if (d < Math.max(s.rpx, 4)) { if (!on || s.dist < on.dist) on = s; }
+    else if (d < Math.max(s.rpx, 12) && d < nearD) { near = s; nearD = d; }
   }
-  return best;
+  if (on || dotsOnly) return on ? on.name : null;
+  return labels.at(cx, cy) || (near || {}).name || null;
 }
-let pointer = null, hovered = null;
+let pointer = null, hovered = null;   // the mouse over the view or a label, client pixels
 const hoverRing = $('hoverRing');
 function updateHover() {
-  const name = labels.hover || (pointer && pick(...pointer) || {}).name || null;
+  const name = labels.hover ? (pointer && bodyAt(...pointer, true)) || labels.hover : pointer && bodyAt(...pointer);
   const s = name && screenPos.find(p => p.name === name);
   if (name !== hovered) { hovered = name; renderer.domElement.style.cursor = pointer && name ? 'pointer' : ''; }
   // a thin ring just outside the drawn disc; bodies larger than the screen need none
@@ -516,7 +566,22 @@ function setPanel(v, remember = false) {
   $('bodiesTab').setAttribute('aria-expanded', v === 'bodies');
   $('settingsTab').setAttribute('aria-expanded', v === 'settings');
   if (remember && !PHONE.matches) try { localStorage.setItem('solarSystem.bodies', v === 'bodies' ? 'open' : 'folded'); } catch {}
+  evenPanes();
   hudBoxes = null; wake();
+}
+// The list (its planets alone) and the settings are padded at the bottom to the same height, so that
+// switching between them does not move the panel's lower edge; moons opened in the list still
+// lengthen it. Measured, as which of the two is taller depends on the layout (phones have taller
+// rows). scrollHeight is the content's height even where the panel squeezes them (phones).
+function evenPanes() {
+  const el = $('bodies'), list = $('bodyList'), set = $('settings'), shown = [list.hidden, set.hidden];
+  el.style.setProperty('--list-pad', '0px'); el.style.setProperty('--set-pad', '0px');
+  list.hidden = set.hidden = false;
+  let h = list.scrollHeight;
+  for (const li of list.querySelectorAll('.body-item[data-parent]:not([hidden])')) h -= li.offsetHeight;
+  const d = set.scrollHeight - h;
+  [list.hidden, set.hidden] = shown;
+  el.style.setProperty('--list-pad', Math.max(d, 0) + 'px'); el.style.setProperty('--set-pad', Math.max(-d, 0) + 'px');
 }
 const openSettings = () => { beforeSettings = panel; setPanel('settings'); };
 let bodiesOpen = !PHONE.matches;
@@ -912,18 +977,19 @@ function wire() {
   onTap(cv, e => {
     // the labels let touches through to the view (see style.css), so a tap on one
     // is found here
-    const r = cv.getBoundingClientRect(), name = labels.at(e.clientX, e.clientY) || (pick(e.clientX - r.left, e.clientY - r.top) || {}).name;
+    const name = bodyAt(e.clientX, e.clientY);
     if (name) select(name, true);
     else if (hud.hidden) hud.set(false);
   });
-  // hover: a faint ring and a pointer cursor say that bodies can be clicked
-  cv.addEventListener('pointermove', e => {
-    if (e.pointerType !== 'mouse' || e.buttons) { pointer = null; updateHover(); return; }
-    const r = cv.getBoundingClientRect();
-    pointer = [e.clientX - r.left, e.clientY - r.top];
+  // hover: a faint ring and a pointer cursor say that bodies can be clicked (over a label too,
+  // which may have a dot under it that a click would choose instead)
+  const hover = e => {
+    pointer = e.pointerType !== 'mouse' || e.buttons ? null : [e.clientX, e.clientY];
     updateHover();
-  }, { passive: true });
-  cv.addEventListener('pointerleave', () => { pointer = null; updateHover(); });
+  };
+  cv.addEventListener('pointermove', hover, { passive: true });
+  $('labels').addEventListener('pointermove', hover, { passive: true });
+  for (const el of [cv, $('labels')]) el.addEventListener('pointerleave', () => { pointer = null; updateHover(); });
 
   // whether focus was last moved with the keyboard (Tab) rather than by clicking
   let keyboardNav = false;
@@ -950,7 +1016,7 @@ function wire() {
         if (panel === 'settings') { setPanel(beforeSettings); break; }
         camera.fov = DEFAULT_FOV; camera.updateProjectionMatrix();
         select('Sun', false);
-        view.setFocus('Sun', disp, { dist: systemDistance() });
+        view.setFocus('Sun', disp, { dist: systemDistance(), dir: systemDir() });
         break;
       default: used = false;
     }
@@ -975,6 +1041,8 @@ function wire() {
   // and the part of the screen the panels leave free changes with them
   new ResizeObserver(() => { hudBoxes = null; wake(); }).observe($('info'));
   // the panels above the information panel, and the bodies heading the clock must keep clear of on phones
+  // the compact layout's rows are taller
+  PHONE.addEventListener('change', evenPanes);
   const layout = new ResizeObserver(layoutPanels);
   for (const el of [stage, document.querySelector('header.time'), $('right'), $('bodiesBar')]) layout.observe(el);
 }

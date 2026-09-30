@@ -15,7 +15,9 @@ export class View {
     this.controls = new THREE.OrbitControls(camera, dom);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
-    this.controls.zoomSpeed = 1.2;
+    // the wheel and a pinch zoom through _wheel and _touchPan instead
+    this.controls.enableZoom = false;
+    this.zoomSpeed = 1.2;
     this.controls.listenToKeyEvents(window);
     // one finger turns the view about the focus (the stars wheel past, so it reads as moving
     // around it), two fingers pinch to zoom or drag to move the view sideways: _touchPan handles
@@ -29,10 +31,68 @@ export class View {
     this.origin = [0, 0, 0];
     this.tween = null;
     // an explicit fly (distance and direction) gives way to the user; a glide does not need to,
-    // since it only translates and adds the user's own rotation, zoom and pan on top
+    // since it only translates and adds the user's own rotation, zoom and pan on top. It yields to
+    // a wheel turn or a drag once that has moved, not to a bare press: a click or tap on the body
+    // that chooses it again must still find the fly under way (the same 5 px as onTap in hud.js).
     this._yield = () => { if (this.tween && this.tween.cancelable) this.tween = null; };
-    this.controls.addEventListener('start', this._yield);
+    const pressed = new Map();   // pointerId → where it went down
+    dom.addEventListener('pointerdown', e => pressed.set(e.pointerId, [e.clientX, e.clientY]));
+    window.addEventListener('pointermove', e => {
+      const p = pressed.get(e.pointerId);
+      if (p && Math.hypot(e.clientX - p[0], e.clientY - p[1]) > 5) { pressed.delete(e.pointerId); this._yield(); }
+    }, { passive: true });
+    for (const ev of ['pointerup', 'pointercancel']) window.addEventListener(ev, e => pressed.delete(e.pointerId), { passive: true });
     this._touchPan();
+    this._wheel();
+  }
+
+  /**
+   * Wheel zoom, eased and accelerated. OrbitControls jumped a fixed step per wheel event. Here each
+   * event adds to the zoom still to be made (`zoomLeft`, in log distance, so a notch is the same
+   * factor at every scale), and update() makes a share of it each frame (time constant ZOOM_EASE),
+   * so a notch glides instead of jumping. A running measure of how much has just been scrolled the
+   * same way (`heat`, in notches, fading over ZOOM_HEAT) enlarges the steps: a notch now and then
+   * still moves by the usual 6%, but a fast spin of the wheel or a flick on a trackpad grows them up
+   * to ZOOM_GAIN times, so the 10⁵ between a close look and the whole system is a few turns of the
+   * wheel rather than a few hundred notches. A trackpad pinch (a wheel event marked ctrlKey without
+   * the Ctrl key down) follows the fingers at once, like a pinch on a touch screen.
+   */
+  _wheel() {
+    const ZOOM_EASE = 90, ZOOM_HEAT = 350, ZOOM_GAIN = 8;
+    const step = this.zoomSpeed * Math.log(1 / 0.95);   // per notch, as OrbitControls
+    let heat = 0, heatT = 0, heatDir = 0, ctrlHeld = false;
+    this.zoomLeft = 0;
+    // a pinch arrives with ctrlKey set but no Ctrl key down (as OrbitControls tells them apart)
+    for (const ev of ['keydown', 'keyup']) window.addEventListener(ev, e => { if (e.key === 'Control') ctrlHeld = ev === 'keydown'; });
+    window.addEventListener('blur', () => { ctrlHeld = false; });
+    this.dom.addEventListener('wheel', e => {
+      e.preventDefault();
+      // in notches: Chrome gives 100 px per notch; lines and pages as OrbitControls counts them
+      const n = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1) / 100;
+      if (!n) return;   // sideways only (a trackpad): no zoom, and a flight goes on
+      this._yield();
+      if (e.ctrlKey && !ctrlHeld) { this.zoomBy(10 * n * step); return; }
+      const now = performance.now(), dir = Math.sign(n);
+      // the page may have been resting (no update() calls): the easing starts from this event
+      if (!this.zoomLeft) this._last = now;
+      heat = dir === heatDir ? heat * Math.exp(-(now - heatT) / ZOOM_HEAT) : 0;
+      heatT = now; heatDir = dir;
+      this.zoomLeft += n * step * Math.min(ZOOM_GAIN, 1 + 0.15 * heat * heat);
+      heat += Math.abs(n);
+    }, { passive: false });
+    this._zoomStep = dt => {
+      if (!this.zoomLeft) return;
+      const k = Math.abs(this.zoomLeft) < 1e-4 ? 1 : 1 - Math.exp(-dt / ZOOM_EASE);
+      this.zoomBy(this.zoomLeft * k);
+      this.zoomLeft -= this.zoomLeft * k;
+    };
+  }
+
+  /** move the camera nearer (x < 0) or farther by a factor e^x; update() keeps it within the limits */
+  zoomBy(x) {
+    const c = this.camera, t = this.controls.target;
+    _o.subVectors(c.position, t).multiplyScalar(Math.exp(x));
+    c.position.copy(t).add(_o);
   }
 
   /**
@@ -94,7 +154,7 @@ export class View {
       else {
         // as OrbitControls zooms on a pinch; its update then keeps the distance within its limits
         const c = this.camera, t = this.controls.target;
-        _o.subVectors(c.position, t).multiplyScalar(Math.pow(g.last.sep / Math.max(m.sep, 1), this.controls.zoomSpeed));
+        _o.subVectors(c.position, t).multiplyScalar(Math.pow(g.last.sep / Math.max(m.sep, 1), this.zoomSpeed));
         c.position.copy(t).add(_o);
       }
       g.last = m;
@@ -150,6 +210,7 @@ export class View {
   /** an explicit move: target to the origin, camera to distance `dist`, optionally from direction `dir` */
   flyTo(dist, { dir = null, ms = 1400, cancelable = true } = {}) {
     const c = this.camera, t = this.controls.target;
+    this.zoomLeft = 0;   // the rest of a wheel zoom would carry the camera past where it flies to
     this.tween = {
       kind: 'fly', t0: performance.now(), ms, cancelable,
       fromTarget: t.clone(), fromDist: this.distance(), toDist: dist,
@@ -169,6 +230,8 @@ export class View {
 
   /** per frame, after display positions are known */
   update(disp, focusRadius, maxDist) {
+    const now = performance.now(), dt = Math.min(100, now - (this._last || now));   // ms
+    this._last = now;
     this._touchStep();
     const o = disp[this.focus];
     const d = [o[0] - this.origin[0], o[1] - this.origin[1], o[2] - this.origin[2]];
@@ -205,8 +268,11 @@ export class View {
     const nearFocus = t.length() < focusRadius * 0.5;
     this.controls.minDistance = nearFocus ? focusRadius * 1.02 : 1e-9;
     this.controls.maxDistance = maxDist;
+    this._zoomStep(dt);
     this.controls.update();
     const cd = this.distance();
+    // at a limit, the rest of a wheel zoom is dropped, or turning back would first have to undo it
+    if (this.zoomLeft < 0 ? cd <= this.controls.minDistance * 1.001 : cd >= maxDist * 0.999) this.zoomLeft = 0;
     // logarithmic depth buffer: a generous range costs nothing, but the near plane must stay in
     // front of the closest surface
     const near = Math.max(1e-9, (nearFocus ? cd - focusRadius : cd) * 1e-3);

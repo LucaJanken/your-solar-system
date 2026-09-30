@@ -58,24 +58,31 @@ GitHub Pages serves the repository as-is.
   choice is remembered. An Extrapolated tag appears outside the validated 1800–2050.
 - Selecting a body glides the camera over to it without changing zoom or viewing angle (it only
   backs off if it would end up inside the body). Selecting it again flies in to a comfortable view
-  of its lit side; a third time flies back out. Lock keeps the camera travelling with the
-  selected body; locking again after drifting catches up with it. Axis shows its spin axis.
-- Dragging (one finger) turns the view around the focus; scroll or pinch zooms. Moving the view
-  sideways (right- or shift-drag, arrow keys, two-finger drag) also works locked: the camera keeps
-  following the body from there. A two-finger gesture either pinches or drags, never both. A
-  planet's arrow, right beside its name, opens its moons in the list, and they stay listed until
-  the arrow closes them; the moons that selecting a body lists close again when a body of another
-  system is selected, so going through the planets leaves only the current one open. The information panel
-  starts folded down to the body's name: tapping it opens it, and its – button folds it again. It
-  never comes closer to the panels above it than to the bottom bar (or edge) below it: it scrolls
-  inside instead.
+  of its lit side; a third time, while still that close, flies back out to where the camera was
+  before (where it was when the body was selected, if it had been zoomed in by hand), also after
+  moving on to a body nearby, or, with no such view, to the body's surroundings (a moon's planet, a
+  planet's moons). Zoomed out by hand from the close look, selecting it flies in again, and the next
+  time back out to where it was zoomed out to.
+  Selecting it during either flight turns the camera round. In the view, a body's dot under the pointer is chosen before
+  a label beside it. Lock keeps the camera travelling with the selected body; locking again after
+  drifting catches up with it. Axis shows its spin axis.
+- Dragging (one finger) turns the view around the focus; scroll or pinch zooms. The wheel eases each
+  step in, and its steps grow (up to 8×) the faster it is turned, so a quick spin crosses from a
+  close look to the whole system. Moving the view sideways (right- or shift-drag, arrow keys,
+  two-finger drag) also works locked: the camera keeps following the body from there. A two-finger
+  gesture either pinches or drags, never both. A planet's arrow, right beside its name, opens its
+  moons in the list, and they stay listed until the arrow closes them; the moons that selecting a
+  body lists close again when a body of another system is selected, so going through the planets
+  leaves only the current one open. The information panel starts folded down to the body's name:
+  tapping it opens it, and its – button folds it again. It never comes closer to the panels above it
+  than to the bottom bar (or edge) below it: it scrolls inside instead.
 - A view given in the URL hash (`#t=…&focus=…&sel=…&scale=…&speed=…&dir=-1&play=0&cam=…`), as
   links from the former Share view carry it, is still read on load; `dir=-1` turns on reverse. The
   page no longer writes one.
 - The Guide shows the essential controls and keyboard shortcuts first (the shortcuts are hidden on
   touchscreens); the details (more controls, scale, shadows, accuracy, what the picture shows,
   sources) are folded into sections below. The Extrapolated tag opens it at the accuracy section.
-- The Guide ends with a line on support: the site is free, without ads or an account, and a Ko-fi
+- The Guide ends with a line on support: the site is free and has no ads, and a Ko-fi
   link.
 
 To run it locally, serve the repository root over HTTP (ES modules and the events worker do not load

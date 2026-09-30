@@ -72,8 +72,10 @@ button.chip:hover { color: var(--text); }
 .right > * { pointer-events: auto; }
 /* one width for the list and the settings, so swapping them does not move the panel's edge */
 .bodies { position: relative; width: 184px; flex: 0 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
-.bodies-bar { position: sticky; top: 0; z-index: 1; display: flex; height: var(--bar-h); background: #0a0c15; }
-.bodies:not(.folded) .bodies-bar { border-bottom: 1px solid var(--line); }
+/* the line under the heading is only hidden while folded, never removed, so the tabs keep their height
+   and their icons do not jump a pixel when the panel opens or folds */
+.bodies-bar { position: sticky; top: 0; z-index: 1; display: flex; height: var(--bar-h); background: #0a0c15; border-bottom: 1px solid transparent; }
+.bodies:not(.folded) .bodies-bar { border-bottom-color: var(--line); }
 /* three tabs in equal columns, each its icon above its name: Bodies and Settings show their content
    (choosing the one shown folds the panel), Guide opens the guide; what is shown is lit and underlined */
 .tab { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; height: 100%; border: 0; background: none; padding: 0; color: var(--text-3); }
@@ -81,7 +83,8 @@ button.chip:hover { color: var(--text); }
 .tab[aria-expanded="true"] { color: var(--accent-text); box-shadow: inset 0 -2px var(--accent); }
 .tab-ic { display: block; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
 .tab-tx { font: 400 9px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; }
-.settings { padding: 11px 0 12px; }
+/* the bottom padding evens the settings and the list (--set-pad, --list-pad: evenPanes in main.js) */
+.settings { padding: 11px 0 calc(12px + var(--set-pad, 0px)); }
 .settings h2 { padding: 0 12px 6px; }
 .sw { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; border: 0; background: none; padding: 7px 12px; font: 400 10px/1.2 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); text-align: left; }
 .sw:hover { background: rgba(255,255,255,0.05); color: var(--text-2); }
@@ -96,7 +99,7 @@ button.chip:hover { color: var(--text); }
 .scale-ends button { border: 0; background: none; padding: 2px 0; font: 400 10px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
 .scale-ends button:hover, .scale-ends button.on { color: var(--accent-text); }
 
-.bodies ul { list-style: none; margin: 0; padding: 4px 0 6px; }
+.bodies ul { list-style: none; margin: 0; padding: 4px 0 calc(6px + var(--list-pad, 0px)); }
 .body-item { display: flex; border-left: 2px solid transparent; }
 .body-item.cur { border-left-color: var(--accent); background: var(--accent-soft); }
 .body-btn { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; border: 0; background: transparent; padding: 7px 8px 7px 12px; text-align: left; font: 400 11px/1 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-2); }

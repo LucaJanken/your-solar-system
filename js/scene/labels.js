@@ -31,7 +31,7 @@ export class Labels {
       el.textContent = def.name;
       // lightened so that dark body colours (Mars, Neptune) stay readable on the night sky
       el.style.color = `color-mix(in oklab, ${def.color} 72%, white)`;
-      el.addEventListener('click', e => { e.stopPropagation(); onPick(def.name); });
+      el.addEventListener('click', e => { e.stopPropagation(); onPick(def.name, e); });
       el.addEventListener('pointerenter', () => { this.hover = def.name; onHover(); });
       el.addEventListener('pointerleave', () => { if (this.hover === def.name) this.hover = null; onHover(); });
       layer.appendChild(el);
