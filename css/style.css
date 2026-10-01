@@ -306,6 +306,8 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
   .chip { height: 26px; padding: 0 9px; }
   .icon-chip svg { width: 17px; height: 17px; }
   .sw { padding: 10px 14px; font-size: 13px; }
+  /* True and Overview share a 106 px row: smaller, so a clear gap stays between them */
+  .scale-ends button { font-size: 10px; letter-spacing: 0.06em; }
   /* finger-sized rows */
   /* Garamond's capitals are wide: tighter spacing, and a narrower arrow, keep the names clear of it */
   .body-btn { padding: 11px 8px 11px 14px; font-size: 12px; letter-spacing: 0.08em; }
