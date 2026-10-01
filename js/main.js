@@ -118,8 +118,8 @@ function systemDistance() {
   return Math.max(R / tanX, R * Math.cos(SYSTEM_ELEV) + R * Math.sin(SYSTEM_ELEV) / tanY);
 }
 // The overview's viewing direction: from the side the camera is on now, at SYSTEM_ELEV above the
-// ecliptic, for which systemDistance is fitted (from a close look at a planet's lit side the camera
-// is often nearly in the ecliptic, and the orbits would be seen edge-on).
+// ecliptic, for which systemDistance is fitted (a close look at a planet is often from nearly in
+// the ecliptic, and the orbits would be seen edge-on).
 function systemDir() {
   const c = camera.position.clone().sub(view.controls.target).setY(0);
   if (c.lengthSq() < 1e-24) return SYSTEM_DIR.clone();
@@ -146,20 +146,6 @@ function maxDistance() {
   const side = Math.min(W, H, free.bottom - free.top);
   return Math.max(3.2 * scale.helio(50 * AU_KM), 1.15 * r / Math.sin(Math.atan(Math.tan(DEFAULT_FOV * Math.PI / 360) * side / H)));
 }
-// The viewing direction for that close look: the user's own, turned toward the Sun just enough that
-// the body is seen at most 60° from full phase (three quarters lit) rather than as a dark disc.
-const MAX_PHASE = Math.PI / 3;
-function litSide(name) {
-  if (name === 'Sun') return null;
-  const s = new THREE.Vector3(...disp[name]).negate().normalize();
-  const c = camera.position.clone().sub(view.controls.target).normalize(), cos = c.dot(s);
-  if (cos >= Math.cos(MAX_PHASE)) return c;
-  const perp = c.addScaledVector(s, -cos);
-  // straight from behind: come round over the body's north side of the ecliptic
-  if (perp.lengthSq() < 1e-6) perp.set(0, 1, 0).addScaledVector(s, -s.y);
-  return s.multiplyScalar(Math.cos(MAX_PHASE)).addScaledVector(perp.normalize(), Math.sin(MAX_PHASE));
-}
-
 // On phones the clock covers the top of the screen and the information panel and time controls
 // the lower half, right where the focused body would be. The projection is shifted (a view offset,
 // so orbiting still turns about the body) to put the focus in the middle of the part left free.
@@ -220,33 +206,35 @@ function select(name, fly) {
   hudDirty = true;
 }
 
-// Choosing the selected body again flies in to a comfortable view of it, from its lit side; choosing
-// it once more, while still that close, flies back out to where the camera was when the flight in
-// began, at that distance and from that side (if it was already about as close, zoomed in by hand,
-// to where it was when the body was chosen). Zoomed out by hand from the close look, choosing it
-// flies in again, and the way back is then to where it was zoomed out to. Choosing another body
-// nearby during the close look keeps the way back. Distances are judged by where the camera is
-// heading, so that choosing the body again during either flight turns it round, and the way back
-// stays the one from before the first flight in.
-let closeUp = { back: null, close: false };   // back: { dist, dir } | null; close: flown in since
+// Choosing the selected body again flies straight in to a comfortable view of it, keeping the
+// viewing direction (it used to turn toward the lit side, which proved more jarring than helpful;
+// the Night sides slider lights a dark side instead); choosing it once more, while still that
+// close, flies straight back out to the distance the camera was at when the flight in began (if it
+// was already about as close, zoomed in by hand, to the distance it had when the body was chosen).
+// Only the distance is remembered: the way out keeps whatever direction the view has been turned
+// to, as the way in does. Zoomed out by hand from the close look, choosing it flies in again, and
+// the way back is then to where it was zoomed out to. Choosing another body nearby during the close
+// look keeps the way back. Distances are judged by where the camera is heading, so that choosing
+// the body again during either flight turns it round, and the way back stays the one from before
+// the first flight in.
+let closeUp = { back: null, close: false };   // back: { dist } | null; close: flown in since
 const aimedView = () => {
   const tw = view.tween;
-  return tw ? { dist: tw.toDist, dir: tw.toDir || camDir() } : { dist: view.distance() * Math.exp(view.zoomLeft), dir: camDir() };
+  return { dist: tw ? tw.toDist : view.distance() * Math.exp(view.zoomLeft) };
 };
-const camDir = () => camera.position.clone().sub(view.controls.target).normalize();
 function closeLook(name) {
   const close = closeDistance(name), now = aimedView(), prev = closeUp.back;
   const far = v => v && v.dist > close * 1.1;
   // in the close look (or nearer, zoomed in by hand): back out
   if (closeUp.close && now.dist < close * 1.1) {
     closeUp = { back: null, close: false };
-    view.setFocus(name, disp, far(prev) ? prev : neighbourhood(name));
+    view.setFocus(name, disp, far(prev) ? { dist: prev.dist, dir: null } : neighbourhood(name));
     return;
   }
   // in, remembering where the camera is now; if it is already about as close (zoomed in by hand
   // since the body was chosen), the view on arrival instead
-  closeUp = { back: far(now) ? now : far(prev) ? prev : neighbourhood(name), close: true };
-  view.setFocus(name, disp, { dist: close, dir: litSide(name) });
+  closeUp = { back: far(now) ? now : far(prev) ? prev : null, close: true };
+  view.setFocus(name, disp, { dist: close, dir: null });
 }
 // where the way back out of a close look leads when there is no view to return to: the body's
 // surroundings, which for a moon are its planet and orbit, for a planet its moons, and for the Sun

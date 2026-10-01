@@ -66,12 +66,14 @@ GitHub Pages serves the repository as-is.
 - The clock shows Local time, UTC, or Scientific (UT, with TT, ΔT and the Julian Date); the
   choice is remembered. An Extrapolated tag appears outside the validated 1800–2050.
 - Selecting a body glides the camera over to it without changing zoom or viewing angle (it only
-  backs off if it would end up inside the body). Selecting it again flies in to a comfortable view
-  of its lit side; a third time, while still that close, flies back out to where the camera was
-  before (where it was when the body was selected, if it had been zoomed in by hand), also after
-  moving on to a body nearby, or, with no such view, to the body's surroundings (a moon's planet, a
-  planet's moons). Zoomed out by hand from the close look, selecting it flies in again, and the next
-  time back out to where it was zoomed out to.
+  backs off if it would end up inside the body). Selecting it again flies straight in to a
+  comfortable view of it, from the same side; a third time, while still that close, flies straight
+  back out to the distance the camera was at before (the one it had when the body was selected, if
+  it had been zoomed in by hand), also after moving on to a body nearby, or, with no such distance,
+  to the body's surroundings (a moon's planet, a planet's moons; for the Sun, the whole system, seen
+  from a little above the ecliptic). Otherwise neither flight turns the view. Zoomed out by hand
+  from the close look, selecting it flies in again, and the next time back out to where it was
+  zoomed out to.
   Selecting it during either flight turns the camera round. In the view, a body's dot under the pointer is chosen before
   a label beside it. Lock keeps the camera travelling with the selected body; locking again after
   drifting catches up with it. Spin axis shows its rotation axis.
