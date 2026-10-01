@@ -30,10 +30,12 @@ GitHub Pages serves the repository as-is.
   is tapped. Esc closes the settings. On phones the tabs show only their icons, and the panel is only
   as wide as they are, so the clock beside it keeps its room.
 - The Guide and the eclipses list close again from their own button, with a click or tap outside
-  them, or with Esc. They open in the space the panels leave free, so they cover none of them: beside
-  the panels, or else between those at the top and at the bottom; where even that is too small
-  (phones, tablets held upright) the bodies panel and the information panel fold while one is open,
-  and open again when it closes.
+  them, or with Esc. They cover none of the panels. On computers they are centred on the screen and
+  moved only as far as they must be to clear the panels beside them; where those leave too little
+  room they lie between the panels at the top and at the bottom. On phones they lie between those,
+  as wide as the information panel and the time controls, and the bodies panel folds while one is
+  open (showing the list or the settings alike); where there is still too little room the
+  information panel folds too. Both open again when it closes.
 - Below 960 px wide (phones, and tablets held upright: iPad mini to iPad Pro 11") or 480 px tall,
   the compact phone layout is used ("on phones" in this list), as the information panel and the
   time controls no longer fit side by side.
@@ -81,8 +83,13 @@ GitHub Pages serves the repository as-is.
   moons in the list, and they stay listed until the arrow closes them; the moons that selecting a
   body lists close again when a body of another system is selected, so going through the planets
   leaves only the current one open. The information panel starts folded down to the body's name:
-  tapping it opens it, and its – button folds it again. It never comes closer to the panels above it
-  than to the bottom bar (or edge) below it: it scrolls inside instead.
+  tapping it opens it, and its – button folds it again. On phones an open panel shows the
+  description and the main figures, and tapping it shows all of its data. Panels on top of each
+  other keep the gap of the screen's edge between them: the bodies panel grows (with the moons
+  opened in its list) until it is that far from the panel below it (the information panel, open or
+  folded, on phones; the time controls elsewhere) and then scrolls; the information panel never
+  comes closer to the panels above it, and scrolls inside instead. Where they meet on phones the
+  information panel keeps its height and the bodies panel keeps at least its first few rows.
 - A view given in the URL hash (`#t=…&focus=…&sel=…&scale=…&speed=…&dir=-1&play=0&cam=…`), as
   links from the former Share view carry it, is still read on load; `dir=-1` turns on reverse. The
   page no longer writes one.

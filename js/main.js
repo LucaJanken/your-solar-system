@@ -837,15 +837,16 @@ function jumpToEvent(e) {
 const SHEET_BTN = { guide: 'guideBtn', events: 'eventsBtn' };
 const openSheetEl = () => document.querySelector('.sheet:not([hidden])');
 function paintSheetBtns() { for (const [id, btn] of Object.entries(SHEET_BTN)) $(btn).setAttribute('aria-expanded', !$(id).hidden); }
-// Where the panels leave no room for it (phones, tablets held upright), the bodies panel and then
-// the information panel fold while the sheet is open, and open again when it closes. A press on the
+// On phones and upright tablets the bodies panel folds while a sheet is open, whether it shows the
+// list or the settings (elsewhere only where the panels leave the sheet no room), and the information
+// panel folds too where there is still no room; both open again when the sheet closes. A press on the
 // Bodies or Settings tab closes the sheet without reopening the bodies panel, which the tab's own
 // click then sets (reopened first, the Bodies tab would fold it again at once).
 let unfoldAfterSheet = null;
 function openSheet(id) {
   closeSheets();
   $(id).hidden = false;
-  if (!placeSheet()) {
+  if (PHONE.matches || !placeSheet()) {
     unfoldAfterSheet = { panel, info: !info.min };
     if (panel) setPanel(null);
     if (!placeSheet() && !info.min) { info.setMin(true); placeSheet(); }
@@ -860,20 +861,24 @@ function closeSheets({ keepPanel = false } = {}) {
   if (u?.panel && !keepPanel) setPanel(u.panel);
   if (u?.info) info.setMin(false);
 }
-// An open sheet sits in the space the panels leave free, so it covers none of them: beside them
-// where there is room (right of the clock and the information panel, left of the bodies panel, above
-// the time controls), otherwise between the panels at the top and those at the bottom (phones, and
-// tablets held upright). Where neither leaves enough room it is centred over everything (style.css),
-// and this returns false.
+// An open sheet covers none of the panels. On computers it is centred on the screen, moved only as
+// far as it must be to stay clear of the panels beside it (right of the clock and the information
+// panel, left of the bodies panel, above the time controls). Where they leave too little room, and on
+// phones and upright tablets, it lies between the panels at the top and those at the bottom, as wide
+// as the screen's gaps allow (on phones as wide as the panels, style.css). Where neither leaves
+// enough room it is centred over everything (style.css), and this returns false.
 function placeSheet() {
   const s = openSheetEl();
   if (!s) return true;
   s.style.left = s.style.top = s.style.width = s.style.maxHeight = s.style.height = s.style.transform = '';
   if (hud.hidden) return true;
-  const app = $('app').getBoundingClientRect(), gap = parseFloat(getComputedStyle($('app')).getPropertyValue('--gap')) || 20;
+  const app = $('app').getBoundingClientRect(), gap = gapPx();
   const box = el => { const r = el.getBoundingClientRect(); return { l: r.left - app.left, r: r.right - app.left, t: r.top - app.top, b: r.bottom - app.top }; };
   const time = document.querySelector('header.time'), ctl = document.querySelector('.timectl');
-  let top = gap, bottom = box(ctl).t - gap, left = gap, right = app.width - gap;
+  const cs = getComputedStyle(s), minW = Math.min(420, s.offsetWidth);
+  const natH = s.id === 'events' ? parseFloat(cs.height) : s.offsetHeight;
+  const clamp = (x, lo, hi) => Math.max(lo, Math.min(x, hi));
+  let top = gap, bottom = box(ctl).t - gap, left = gap, right = app.width - gap, beside = false;
   if (!PHONE.matches) {
     for (const el of [time, $('info')]) {
       const r = box(el);
@@ -881,20 +886,21 @@ function placeSheet() {
     }
     const rc = box($('right'));
     if (rc.b > top && rc.t < bottom) right = Math.min(right, rc.l - gap);
+    beside = right - left >= minW;
   }
-  if (PHONE.matches || right - left < Math.min(420, s.offsetWidth)) {
+  if (!beside) {
     left = gap; right = app.width - gap;
     top = Math.max(box(time).b, box($('right')).b) + gap;
     bottom = Math.min(bottom, box($('info')).t - gap);
   }
-  // its own size, as style.css sets it, fitted into that space
-  const cs = getComputedStyle(s), w = Math.min(s.offsetWidth, right - left);
-  const h = Math.min(s.id === 'events' ? parseFloat(cs.height) : s.offsetHeight, bottom - top);
-  if (right - left < Math.min(420, s.offsetWidth) || h < 320) return false;
+  const w = Math.min(s.offsetWidth, right - left), h = Math.min(natH, bottom - top);
+  if (right - left < minW || h < 320) return false;
   s.style.transform = 'none';
-  s.style.width = w + 'px';
-  s.style.left = left + (right - left - w) / 2 + 'px';
-  s.style.top = top + (bottom - top - h) / 2 + 'px';
+  if (!PHONE.matches) {
+    s.style.width = w + 'px';
+    s.style.left = clamp((app.width - w) / 2, left, right - w) + 'px';
+  }
+  s.style.top = (beside ? clamp((app.height - h) / 2, top, bottom - h) : top + (bottom - top - h) / 2) + 'px';
   if (s.id === 'events') s.style.height = h + 'px'; else s.style.maxHeight = h + 'px';
   return true;
 }
@@ -1115,24 +1121,37 @@ function wire() {
   new ResizeObserver(() => { $('app').style.setProperty('--ctl-h', ctl.offsetHeight + 'px'); hudBoxes = null; }).observe(ctl);
   // and the part of the screen the panels leave free changes with them
   new ResizeObserver(() => { hudBoxes = null; wake(); }).observe($('info'));
-  // the panels above the information panel, and the bodies heading the clock must keep clear of on phones
   // the compact layout's rows are taller
   PHONE.addEventListener('change', evenPanes);
+  // the panels stacked on each other, and the bodies heading the clock must keep clear of on phones
   const layout = new ResizeObserver(layoutPanels);
-  for (const el of [stage, document.querySelector('header.time'), $('right'), $('bodiesBar')]) layout.observe(el);
+  for (const el of [stage, document.querySelector('header.time'), $('right'), $('bodiesBar'), $('info'), ctl]) layout.observe(el);
 }
 
-// The information panel keeps at least the same gap to the panels above it (the clock and the
-// bodies panel, where they lie over it) as to those below: --info-top is how far down they reach,
-// and the panel's height is capped by it (style.css), so it scrolls inside rather than closing in.
+// The panels on top of each other keep the screen's gap between them, wherever they overlap across
+// the screen: the bodies panel ends that far above the panel under it (the information panel, open or
+// folded, on phones and upright tablets; the time controls elsewhere), its list or settings scrolling
+// within it, and the information panel ends that far below the clock and the bodies panel: --info-top
+// is how far down they reach, and its height is capped by it (style.css), so it scrolls inside rather
+// than closing in. Where the two meet, the information panel has its height and the bodies panel takes
+// what is left, keeping its heading and at least the first few rows of what it shows (MIN_PANE).
+const MIN_PANE = 160;
+const gapPx = () => parseFloat(getComputedStyle($('app')).getPropertyValue('--gap')) || 20;
 function layoutPanels() {
-  const app = $('app'), info = $('info').getBoundingClientRect();
-  let top = 0;
-  for (const el of [document.querySelector('header.time'), $('right')]) {
-    const r = el.getBoundingClientRect();
-    if (r.height && r.right > info.left && r.left < info.right) top = Math.max(top, r.bottom);
+  const app = $('app'), gap = gapPx(), infoEl = $('info'), right = $('right').getBoundingClientRect();
+  const over = (a, b) => a.height && b.height && a.right > b.left && a.left < b.right;
+  let info = infoEl.getBoundingClientRect(), top = 0;
+  const time = document.querySelector('header.time').getBoundingClientRect();
+  if (over(time, info)) top = time.bottom;
+  if (over(right, info)) {
+    const pane = [$('bodyList'), $('settings')].find(el => !el.hidden);
+    top = Math.max(top, $('bodiesBar').getBoundingClientRect().bottom + (pane ? Math.min(pane.scrollHeight, MIN_PANE) : 0));
   }
   app.style.setProperty('--info-top', Math.ceil(top) + 'px');
+  info = infoEl.getBoundingClientRect();
+  let bottom = app.getBoundingClientRect().bottom;
+  for (const r of [document.querySelector('.timectl').getBoundingClientRect(), info]) if (over(r, right)) bottom = Math.min(bottom, r.top);
+  app.style.setProperty('--right-h', Math.floor(bottom - gap - right.top) + 'px');
   app.style.setProperty('--tb-w', Math.ceil($('bodiesBar').getBoundingClientRect().width) + 'px');
 }
 

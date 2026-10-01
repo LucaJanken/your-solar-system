@@ -88,8 +88,9 @@ button.chip:hover { color: var(--text); }
 .time-details span:nth-child(odd) { color: var(--text-3); }
 
 /* ---- right column: the bodies panel, whose heading holds the bodies, the settings and the guide ---- */
-/* it ends above the time controls, and the bodies list scrolls within it */
-.right { position: absolute; top: var(--gap); right: var(--gr); max-height: calc(100% - var(--gap) - var(--ctl-h, 80px) - var(--gb) - var(--gap)); display: flex; flex-direction: column; pointer-events: none; --bar-h: 48px; }
+/* it ends a gap above the panel under it (--right-h: layoutPanels in main.js; until then above the
+   time controls), and the bodies list scrolls within it */
+.right { position: absolute; top: var(--gap); right: var(--gr); max-height: var(--right-h, calc(100% - var(--gap) - var(--ctl-h, 80px) - var(--gb) - var(--gap))); display: flex; flex-direction: column; pointer-events: none; --bar-h: 48px; }
 .right > * { pointer-events: auto; }
 /* one width for the list and the settings, so swapping them does not move the panel's edge */
 .bodies { position: relative; width: 184px; flex: 0 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
@@ -309,7 +310,7 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
   /* clear of the bodies panel's heading (its width, --tb-w, is measured in main.js) */
   .time { min-width: 0; right: calc(var(--gr) + var(--tb-w, 190px) + 8px); }
   .date { font-size: 16px; }
-  .right { max-height: calc(100% - var(--gap) - var(--ctl-h, 110px) - var(--gb) - var(--gap) - 150px); --bar-h: 42px; }
+  .right { --bar-h: 42px; }
   /* the tabs as icons, and the panel only as wide as its heading, open or folded, so the clock
      beside it keeps its room; the list and the settings scroll in their own box below the heading */
   .tab-tx { display: none; }
@@ -346,7 +347,11 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
      in the same place: 9 px above it) */
   .info-min { margin: -5px -8px -5px 0; }
   .info .info-desc { font-size: 15px; }
-  .info:not(.expanded) .info-desc, .info:not(.expanded) details, .info:not(.expanded) .facts .x { display: none; }
+  /* compact: the description and the main figures; tapping adds the rest */
+  .info:not(.expanded) details, .info:not(.expanded) .facts .x { display: none; }
+  /* the guide and the list of events as wide as the panels at the bottom (placeSheet in main.js
+     sets only their height and how far down they are) */
+  .sheet, #guide { left: var(--gl); right: var(--gr); width: auto; transform: translateY(-50%); }
   /* say that the compact panel opens up */
   .info-body::after { content: 'Tap for more'; display: block; margin-top: 9px; font: 500 11px/1 var(--serif); letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); }
   .info.expanded .info-body::after { content: 'Tap for less'; }
@@ -366,7 +371,6 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
   .date-row { margin-top: 2px; }
   .timectl { left: auto; width: min(400px, 52%); }
   .info { right: auto; width: min(360px, calc(100% - min(400px, 52%) - var(--gl) - var(--gr) - var(--gap))); bottom: var(--gb); max-height: calc(100% - var(--info-top, 96px) - var(--gap) - var(--gb)); }
-  .right { max-height: calc(100% - var(--gap) - var(--ctl-h, 90px) - var(--gb) - var(--gap)); }
 }
 @media (max-height: 600px) and (min-height: 481px) and (min-width: 960px) {
   .clock { font-size: 28px; }
