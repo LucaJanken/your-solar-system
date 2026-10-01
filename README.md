@@ -59,7 +59,8 @@ GitHub Pages serves the repository as-is.
   applies it), on computers through a small popover with Set (or Enter; Esc closes it).
 - Eclipses & transits lists solar and lunar eclipses and transits of Mercury and Venus, opening at
   the displayed date and loading more as it is scrolled either way (searched in a worker). The kinds
-  shown can be switched off and on (remembered); choosing an event goes there.
+  shown can be switched off and on (remembered); choosing an event goes there. Times are given as
+  the clock shows them (local time, UTC, or UT in Scientific).
 - The clock shows Local time, UTC, or Scientific (UT, with TT, ΔT and the Julian Date); the
   choice is remembered. An Extrapolated tag appears outside the validated 1800–2050.
 - Selecting a body glides the camera over to it without changing zoom or viewing angle (it only

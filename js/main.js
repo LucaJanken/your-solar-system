@@ -500,6 +500,8 @@ function setTimeMode(m) {
   $('timeDetails').hidden = m !== 'Scientific';
   // the date field is typed in the same time as the clock shows
   $('when').setAttribute('aria-label', m === 'Local' ? 'Date and time (local)' : 'Date and time (UTC)');
+  // and so are the times in the events list
+  if (!$('events').hidden) rebuildEvents();
   hudBoxes = null; hudDirty = true; wake();
 }
 const timeEls = { clock: $('clock'), date: $('date'), tz: $('tzLabel'), badge: $('badge') };
@@ -654,7 +656,12 @@ try { const k = JSON.parse(localStorage.getItem('solarSystem.evKinds')); if (Arr
 // gen: which list the replies belong to (a new one starts when the list is rebuilt); busy: a step
 // is being searched; anchor: the instant to bring to the top once the first rows arrive
 const ev = { gen: 0, at: 0, anchor: null, busy: false, atStart: true, atEnd: true, on: false, queued: false };
-const evYear = t => civil(new Date(t), true).y;
+// Times are given as the clock shows them, in local time or UTC (UT in Scientific), and the rows
+// are grouped by the year in that time (local time can put an event in the next or previous year)
+const evUtc = () => timeMode !== 'Local';
+const evYear = t => civil(new Date(t), evUtc()).y;
+const evZone = d => timeMode === 'Local' ? tzName(d) : timeMode === 'Scientific' ? 'UT' : 'UTC';
+const evWhen = (d, sep) => fmtDate(d, evUtc()) + sep + fmtTime(d, evUtc(), false) + ' ' + evZone(d);
 
 // the worker (started on first use), or if it cannot start, the same searches on the page
 let evPost = m => {
@@ -743,14 +750,14 @@ function eventRow(e) {
   if (cur) b.setAttribute('aria-current', 'true');
   else if (e.date < ev.at) b.classList.add('past');
   const color = EV_COLOR[e.kind] || BY_NAME[e.sub].color;
-  b.innerHTML = `<span class="d">${fmtDate(e.date, true)}<br>${fmtTime(e.date, true, false)} UT</span><span class="t"><i class="k" style="background:${color}"></i>${e.title}${cur ? '<span class="tag">shown</span>' : ''}</span><span class="w">${e.detail}</span>`;
+  b.innerHTML = `<span class="d">${evWhen(e.date, '<br>')}</span><span class="t"><i class="k" style="background:${color}"></i>${e.title}${cur ? '<span class="tag">shown</span>' : ''}</span><span class="w">${e.detail}</span>`;
   b.addEventListener('click', () => { closeSheets(); jumpToEvent(e); });
   return b;
 }
 function nowRow() {
   const d = document.createElement('div');
   d.className = 'ev-now'; d.dataset.t = ev.at;
-  d.textContent = `Displayed · ${fmtDate(new Date(ev.at), true)} ${fmtTime(new Date(ev.at), true, false)} UT`;
+  d.textContent = `Displayed · ${evWhen(new Date(ev.at), ' ')}`;
   return d;
 }
 function paintEvEdges() {
@@ -774,7 +781,10 @@ function queueEvFill() { if (!ev.queued) { ev.queued = true; requestAnimationFra
 function setEvKind(k) {
   if (evKinds.has(k)) evKinds.delete(k); else evKinds.add(k);
   try { localStorage.setItem('solarSystem.evKinds', JSON.stringify([...evKinds])); } catch {}
-  // keep the place: restart from the first row in view
+  rebuildEvents();
+}
+// rebuild the list, keeping the place: restart from the first row in view
+function rebuildEvents() {
   const list = $('evList'), head = list.querySelector('.ev-year');
   const top = list.getBoundingClientRect().top + (head ? head.offsetHeight : 0);
   const row = [...list.querySelectorAll('.ev, .ev-now')].find(n => n.getBoundingClientRect().bottom > top);
