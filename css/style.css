@@ -33,9 +33,10 @@
   --accent: oklch(var(--accent-lch));
   --accent-soft: oklch(var(--accent-lch) / 0.16);
   --accent-text: oklch(0.92 0.07 90);
-  /* orbits and labels, all in the one ink as on an engraved plate (orbits.js reads it too); the
-     planets' own colours stay on their dots in the lists */
+  /* orbits, labels and the hover ring: the one ink of an engraved plate, washed with each body's
+     own colour by --chart-tint (labels.js, main.js and orbits.js mix them; orbits.js reads both) */
   --chart-ink: #efe6cf;
+  --chart-tint: 75%;
   --mono: 'IBM Plex Mono', ui-monospace, monospace;
   /* Garamond's small x-height: its sizes run about a quarter above Plex's for the same look */
   --serif: 'EB Garamond', Garamond, Georgia, serif;

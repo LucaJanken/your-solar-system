@@ -29,6 +29,8 @@ export class Labels {
       el.type = 'button';
       el.className = 'lbl' + (def.parent && def.parent !== 'Sun' ? ' lbl-moon' : '');
       el.textContent = def.name;
+      // the chart's ink washed with the body's colour (style.css, --chart-tint)
+      el.style.color = `color-mix(in oklab, ${def.color} var(--chart-tint), var(--chart-ink))`;
       el.addEventListener('click', e => { e.stopPropagation(); onPick(def.name, e); });
       el.addEventListener('pointerenter', () => { this.hover = def.name; onHover(); });
       el.addEventListener('pointerleave', () => { if (this.hover === def.name) this.hover = null; onHover(); });

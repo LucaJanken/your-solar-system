@@ -21,13 +21,16 @@ const BEHIND = Float64Array.from({ length: N }, (_, i) => Math.PI * (1 - Math.co
 export class Orbits {
   constructor(scene) {
     this.lines = {};
-    // every orbit in the chart's one ink, as on an engraved atlas plate (style.css, --chart-ink)
-    const c = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--chart-ink').trim());
+    // the chart's ink washed with each body's colour, as the labels are (style.css, --chart-ink and
+    // --chart-tint); mixed in linear RGB rather than the labels' oklab, which differs only slightly
+    const css = getComputedStyle(document.documentElement);
+    const ink = new THREE.Color(css.getPropertyValue('--chart-ink').trim());
+    const tint = parseFloat(css.getPropertyValue('--chart-tint')) / 100;
     for (const def of BODIES) {
       if (!def.parent) continue;
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
-      const col = new Float32Array(N * 4);
+      const col = new Float32Array(N * 4), c = ink.clone().lerp(new THREE.Color(def.color), tint);
       for (let i = 0; i < N; i++) {
         const u = i / (N - 1);
         // brightest right behind the body, fading around the orbit: shows the direction of motion
