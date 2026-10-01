@@ -7,7 +7,7 @@
 import * as THREE from '../../vendor/three.min.js';
 
 const ease = t => t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t);
-const _d = new THREE.Vector3(), _o = new THREE.Vector3();
+const _d = new THREE.Vector3(), _o = new THREE.Vector3(), _q = new THREE.Quaternion();
 
 export class View {
   constructor(camera, dom) {
@@ -203,29 +203,48 @@ export class View {
       kind: 'glide', t0: performance.now(), cancelable: false,
       ms: ms || Math.min(1500, 950 + 160 * Math.log10(1 + R)),
       from: t.clone(), R, last: 1,
-      fromDist: D, toDist: D < minDist ? safeDist : D,
+      fromDist: D, toDist: D < minDist ? safeDist : D, lastDist: D,
     };
   }
 
-  /** an explicit move: target to the origin, camera to distance `dist`, optionally from direction `dir` */
+  /**
+   * An explicit move: target to the origin, camera to distance `dist`, optionally from direction
+   * `dir`, which it turns to by a rotation along the shorter arc (blending the two directions
+   * instead passed through the body when they were nearly opposite)
+   */
   flyTo(dist, { dir = null, ms = 1400, cancelable = true } = {}) {
     const c = this.camera, t = this.controls.target;
     this.zoomLeft = 0;   // the rest of a wheel zoom would carry the camera past where it flies to
+    const fromDir = c.position.clone().sub(t).normalize(), toDir = dir ? dir.clone().normalize() : null;
+    let turn = null;
+    if (toDir) {
+      turn = new THREE.Quaternion().setFromUnitVectors(fromDir, toDir);
+      // straight round: setFromUnitVectors would pick an arbitrary axis; take the vertical one
+      if (fromDir.dot(toDir) < -0.9999) {
+        const axis = _d.set(0, 1, 0).projectOnPlane(fromDir);
+        if (axis.lengthSq() < 1e-6) axis.set(1, 0, 0).projectOnPlane(fromDir);
+        turn.setFromAxisAngle(axis.normalize(), Math.PI);
+      }
+    }
     this.tween = {
       kind: 'fly', t0: performance.now(), ms, cancelable,
-      fromTarget: t.clone(), fromDist: this.distance(), toDist: dist,
-      fromDir: c.position.clone().sub(t).normalize(), toDir: dir ? dir.clone().normalize() : null,
+      fromTarget: t.clone(), fromDist: this.distance(), toDist: dist, fromDir, toDir, turn,
     };
   }
 
-  /** scale the camera offset when the display scale changes, so the view keeps framing the same thing */
-  rescale(f) {
-    const t = this.controls.target;
+  /**
+   * Keep the view framing the same thing when the display scale changes: `map` takes a camera
+   * distance at the old scale to the one at the new scale (mapDistance in main.js), for the camera
+   * and for both ends of a flight under way.
+   */
+  rescale(map) {
+    const t = this.controls.target, D = this.distance(), f = D > 0 ? map(D) / D : 1;
     this.camera.position.sub(t).multiplyScalar(f).add(t.multiplyScalar(f));
     const tw = this.tween;
     if (!tw) return;
-    if (tw.kind === 'fly') { tw.fromDist *= f; tw.toDist *= f; tw.fromTarget.multiplyScalar(f); }
-    else { tw.from.multiplyScalar(f); tw.fromDist *= f; tw.toDist *= f; }
+    tw.fromDist = map(tw.fromDist); tw.toDist = map(tw.toDist);
+    if (tw.kind === 'fly') tw.fromTarget.multiplyScalar(f);
+    else { tw.from.multiplyScalar(f); tw.lastDist = map(tw.lastDist); }
   }
 
   /** per frame, after display positions are known */
@@ -251,16 +270,18 @@ export class View {
       tw.last = left;
       t.add(_d); c.position.add(_d);
       if (tw.toDist !== tw.fromDist) {
+        // also only this frame's share of the change, so a zoom by hand meanwhile is kept
         const dist = tw.fromDist * Math.pow(tw.toDist / tw.fromDist, e);
-        _o.subVectors(c.position, t).setLength(dist);
+        _o.subVectors(c.position, t).multiplyScalar(dist / tw.lastDist);
         c.position.copy(t).add(_o);
+        tw.lastDist = dist;
       }
       if (k >= 1) this.tween = null;
     } else if (tw) {
       const k = ease((performance.now() - tw.t0) / tw.ms);
       t.copy(tw.fromTarget).multiplyScalar(1 - k);
       const dist = tw.fromDist * Math.pow(tw.toDist / tw.fromDist, k);
-      const dir = tw.toDir ? tw.fromDir.clone().lerp(tw.toDir, k).normalize() : c.position.clone().sub(t).normalize();
+      const dir = tw.turn ? tw.fromDir.clone().applyQuaternion(_q.identity().slerp(tw.turn, k)) : c.position.clone().sub(t).normalize();
       if (dir.lengthSq() < 0.5) dir.copy(tw.toDir || new THREE.Vector3(0, 0.4, 1)).normalize();
       c.position.copy(t).addScaledVector(dir, dist);
       if (k >= 1) this.tween = null;

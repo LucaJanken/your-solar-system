@@ -100,17 +100,20 @@ function orbitMapping(name) {
   const pp = disp[def.parent], R = meanRadius(BY_NAME[def.parent]);
   return { centre: [pp[0] - me[0], pp[1] - me[1], pp[2] - me[2]], radial: r => scale.moon(name, def.parent, R, r) };
 }
-const drawnRadius = name => scale.size(meanRadius(BY_NAME[name]));
+// the distances below take a display scale `sc` (default the one shown), so that mapDistance can
+// evaluate them at both ends of a change of scale
+const drawnRadius = (name, sc = scale) => sc.size(meanRadius(BY_NAME[name]));
 // The view of the whole system: Neptune's orbit, with a margin, fits the part of the screen the panels
 // leave free (clear of the side panel on computers), seen from SYSTEM_ELEV above the ecliptic.
 const SYSTEM_ELEV = 0.30;
 const SYSTEM_DIR = new THREE.Vector3(0, Math.sin(SYSTEM_ELEV), -Math.cos(SYSTEM_ELEV));
-function systemDistance() {
-  const W = stage.clientWidth || 1, H = stage.clientHeight || 1, R = 1.08 * scale.helio(30.1 * AU_KM);
-  // the bodies list is in the way where it reaches down toward the middle of the screen (on
-  // computers), the toolbar across the top corner is not
+function systemDistance(sc = scale) {
+  const W = stage.clientWidth || 1, H = stage.clientHeight || 1, R = 1.08 * sc.helio(30.1 * AU_KM);
+  // the open bodies list is in the way (on computers), the toolbar it folds to, across the top
+  // corner, is not. (Judged at 40% of the height, the planets' list alone ended just short of it and
+  // with a planet's moons listed just past it, so this view changed by a quarter with the selection.)
   const col = $('bodies').getBoundingClientRect();
-  const right = !hud.hidden && col.bottom > H * 0.4 ? col.left - 12 : W;
+  const right = !hud.hidden && col.bottom > H * 0.25 ? col.left - 12 : W;
   const tanV = Math.tan(DEFAULT_FOV * Math.PI / 360);
   const tanX = tanV * Math.max(40, Math.min(W / 2, right - W / 2)) / (H / 2);
   const tanY = tanV * Math.min(H, free.bottom - free.top) / H;
@@ -126,14 +129,14 @@ function systemDir() {
   return c.normalize().multiplyScalar(Math.cos(SYSTEM_ELEV)).setY(Math.sin(SYSTEM_ELEV));
 }
 // largest drawn radius (equatorial, for flattened planets)
-const drawnExtent = name => { const d = BY_NAME[name]; return drawnRadius(name) * Math.max(...d.shape) / meanRadius(d); };
+const drawnExtent = (name, sc = scale) => { const d = BY_NAME[name]; return drawnRadius(name, sc) * Math.max(...d.shape) / meanRadius(d); };
 const focusDistance = name => name === 'Sun' ? systemDistance() : closeDistance(name);
 // A comfortable distance to look at a body from: it spans about 40% of the narrower side of the
 // part of the screen the panels leave free (so a phone held upright does not crop it), Saturn's
 // rings included.
-function closeDistance(name) {
+function closeDistance(name, sc = scale) {
   const d = BY_NAME[name], W = stage.clientWidth || 1, H = stage.clientHeight || 1;
-  const extent = Math.max(drawnExtent(name), d.rings && d.rings.outerKm ? drawnRadius(name) * d.rings.outerKm / meanRadius(d) : 0);
+  const extent = Math.max(drawnExtent(name, sc), d.rings && d.rings.outerKm ? drawnRadius(name, sc) * d.rings.outerKm / meanRadius(d) : 0);
   const side = Math.min(W, H, free.bottom - free.top);
   return extent / Math.sin(Math.atan(0.4 * Math.tan(DEFAULT_FOV * Math.PI / 360) * side / H));
 }
@@ -177,10 +180,18 @@ function applyShift(dt) {
   else camera.setViewOffset(W, H, 0, viewShift, W, H);
 }
 
-// ---------------------------------------------------------------- selection and focus
+// ---------------------------------------------------------------- selection and navigation
+// Choosing a body, judged from the view as it is (or is heading, during a flight):
+//  - not centred on it: glide over to it, keeping zoom and viewing direction, but no nearer than
+//    its close look (Earth's close look to Jupiter would put the camera inside it);
+//  - centred: fly straight to its close look, in or (zoomed in by hand) out, without turning;
+//    already there, nothing (left free for something else).
+// Zooming out is the wheel's or pinch's (Escape: the whole system). Nothing is remembered: the same
+// view always answers the same way. (Choosing a body again used to fly back out as well, which
+// needed a rule for how far: remembered distances, or the body's surroundings. There was no answer
+// right for every body, scale and way of getting there; space simulators leave it to the wheel too.)
 function select(name, fly) {
   wake();
-  const again = name === state.selected;
   state.selected = name;
   openSystemOf(name);
   info.show(name);
@@ -188,65 +199,28 @@ function select(name, fly) {
   paintList();
   if (fly) {
     camera.fov = DEFAULT_FOV; camera.updateProjectionMatrix();
-    const R = drawnExtent(name);
-    // chosen again after the view was moved sideways off it: back to the centre first, at the same zoom
-    if (again && view.focus === name && !view.centred()) view.glide({ minDist: R * 1.2, safeDist: R * 3 });
-    else if (again) closeLook(name);
-    else {
-      // otherwise only the target moves; zoom and angle stay the user's, unless the camera would be inside the body
-      view.setFocus(name, disp, { minDist: R * 1.2, safeDist: R * 3 });
-      // the view on arrival is the one a close look returns to; moving on from a close look to a
-      // body that is then about as close (Earth to Venus, Io to Jupiter) stays in it, with the way
-      // back it had, but not to one still far off (Jupiter to Io: that one's close look is next)
-      const arrival = aimedView();
-      if (!closeUp.close || arrival.dist > closeDistance(name) * 2) closeUp = { back: arrival, close: false };
-    }
-  } else closeUp = { back: null, close: false };
+    const close = closeDistance(name), d = aimedDistance();
+    if (view.focus !== name || !view.centred()) view.setFocus(name, disp, { minDist: close, safeDist: close });
+    else if (Math.abs(Math.log(d / close)) > Math.log(1.1)) view.setFocus(name, disp, { dist: close, dir: null });
+  }
   bodies.setAxis(name);
   hudDirty = true;
 }
+// the camera's distance from the focus where it is heading: the end of a flight, or of a wheel zoom
+const aimedDistance = () => view.tween ? view.tween.toDist : view.distance() * Math.exp(view.zoomLeft);
 
-// Choosing the selected body again flies straight in to a comfortable view of it, keeping the
-// viewing direction (it used to turn toward the lit side, which proved more jarring than helpful;
-// the Night sides slider lights a dark side instead); choosing it once more, while still that
-// close, flies straight back out to the distance the camera was at when the flight in began (if it
-// was already about as close, zoomed in by hand, to the distance it had when the body was chosen).
-// Only the distance is remembered: the way out keeps whatever direction the view has been turned
-// to, as the way in does. Zoomed out by hand from the close look, choosing it flies in again, and
-// the way back is then to where it was zoomed out to. Choosing another body nearby during the close
-// look keeps the way back. Distances are judged by where the camera is heading, so that choosing
-// the body again during either flight turns it round, and the way back stays the one from before
-// the first flight in.
-let closeUp = { back: null, close: false };   // back: { dist } | null; close: flown in since
-const aimedView = () => {
-  const tw = view.tween;
-  return { dist: tw ? tw.toDist : view.distance() * Math.exp(view.zoomLeft) };
-};
-function closeLook(name) {
-  const close = closeDistance(name), now = aimedView(), prev = closeUp.back;
-  const far = v => v && v.dist > close * 1.1;
-  // in the close look (or nearer, zoomed in by hand): back out
-  if (closeUp.close && now.dist < close * 1.1) {
-    closeUp = { back: null, close: false };
-    view.setFocus(name, disp, far(prev) ? { dist: prev.dist, dir: null } : neighbourhood(name));
-    return;
-  }
-  // in, remembering where the camera is now; if it is already about as close (zoomed in by hand
-  // since the body was chosen), the view on arrival instead
-  closeUp = { back: far(now) ? now : far(prev) ? prev : null, close: true };
-  view.setFocus(name, disp, { dist: close, dir: null });
-}
-// where the way back out of a close look leads when there is no view to return to: the body's
-// surroundings, which for a moon are its planet and orbit, for a planet its moons, and for the Sun
-// the whole system (a moonless planet: 30 close-look distances, well clear of the body)
-function neighbourhood(name) {
-  const def = BY_NAME[name], close = closeDistance(name);
-  if (name === 'Sun') return { dist: systemDistance(), dir: systemDir() };
-  const span = (a, b) => Math.hypot(disp[a][0] - disp[b][0], disp[a][1] - disp[b][1], disp[a][2] - disp[b][2]);
+// The view of a body's neighbours: for a planet its moons, for a moon its planet (three times their
+// drawn distance, at least four close looks); 0 for the Sun and planets without moons. Only an anchor
+// of mapDistance, so that such a view keeps through a change of scale.
+function moonsDistance(name, sc = scale) {
+  const def = BY_NAME[name];
+  if (name === 'Sun') return 0;
+  // drawn distance of a moon from its planet, as computeDisplay places it
+  const span = m => { const p = BY_NAME[m].parent; return sc.moon(m, p, meanRadius(BY_NAME[p]), Math.hypot(...snap.bodies[m].rel.pos)); };
   let r = 0;
-  if (def.parent !== 'Sun') r = span(name, def.parent);
-  else for (const m of BODIES) if (m.parent === name) r = Math.max(r, span(m.name, name));
-  return { dist: r ? Math.max(3 * r, close * 4) : close * 30, dir: null };
+  if (def.parent !== 'Sun') r = span(name);
+  else for (const m of BODIES) if (m.parent === name) r = Math.max(r, span(m.name));
+  return r && Math.max(3 * r, closeDistance(name, sc) * 4);
 }
 
 // ---------------------------------------------------------------- scale changes
@@ -259,17 +233,50 @@ function setScale(s, animate = true) {
   if (animate && !REDUCED_MOTION) scaleAnim = { from: scale.s, to: s, t0: performance.now(), ms: 2200 };
   else { scaleAnim = null; applyScale(s); }
 }
-// keep the camera framing the same thing while every length changes: from beyond Neptune's orbit,
-// the whole system (the two agree at the orbit itself)
+// The camera distance from `name` at scale s1 that frames what distance d frames at scale s0. The
+// body's own views map exactly onto themselves: its close look, its moons' view, the whole system
+// and the view of the orbits out to Mercury's (taken in that order of priority, each only if it
+// keeps the views in the same order at both scales). In between, distances are interpolated in log
+// space; nearer than the close look the body's drawn size is kept, beyond the whole system its
+// framing. Between the Mercury and system views this is exact for orbits too (the drawn
+// heliocentric distance is a power law of the true one at every scale, and the two views frame
+// orbits alike). It is monotonic, so zooms by hand keep their order, and mapping in steps (the
+// animated change) ends where mapping at once does. The previous rule kept the body's size only
+// within 12 radii, short of the close look on phones and for Saturn, which a scale change then
+// threw 100 times out or into the planet.
+const scaleAt = s => { const sc = new DisplayScale(); sc.s = s; return sc; };
+function mapDistance(name, d, s0, s1) {
+  if (s0 === s1) return d;
+  const a = scaleAt(s0), b = scaleAt(s1);
+  const views = [
+    sc => closeDistance(name, sc),
+    sc => moonsDistance(name, sc),
+    sc => systemDistance(sc),
+    sc => systemDistance(sc) * sc.helio(0.387 * AU_KM) / sc.helio(30.1 * AU_KM),
+  ];
+  const pts = [];   // [log distance at s0, at s1], increasing in both
+  const below = (p, q) => p[0] < q[0] - 1e-6 && p[1] < q[1] - 1e-6;
+  for (const v of views) {
+    const x0 = v(a), x1 = v(b);
+    if (!x0 || !x1) continue;   // a view the body does not have
+    const p = [Math.log(x0), Math.log(x1)];
+    let i = pts.findIndex(q => q[0] > p[0]);
+    if (i < 0) i = pts.length;
+    if ((!i || below(pts[i - 1], p)) && (i === pts.length || below(p, pts[i]))) pts.splice(i, 0, p);
+  }
+  const x = Math.log(d);
+  let i = 0;
+  while (i < pts.length - 1 && x > pts[i + 1][0]) i++;
+  const [p, q] = [pts[i], pts[i + 1]];
+  // outside the views (or with one only): the ratio of the nearest one
+  if (!q || x <= p[0]) return d * Math.exp(p[1] - p[0]);
+  return Math.exp(p[1] + (x - p[0]) * (q[1] - p[1]) / (q[0] - p[0]));
+}
+// keep the camera framing the same thing while every length changes
 function applyScale(s) {
-  const f = view.focus, cd = view.distance(), NEPTUNE_KM = 30.1 * AU_KM;
-  const before = { r: drawnRadius(f), d: helioInverse(cd), n: scale.helio(NEPTUNE_KM) };
+  const f = view.focus, s0 = scale.s;
   scale.s = s;
-  let factor;
-  if (f !== 'Sun' && cd < 12 * before.r) factor = drawnRadius(f) / before.r;
-  else if (cd > before.n) factor = scale.helio(NEPTUNE_KM) / before.n;
-  else factor = scale.helio(before.d) / cd;
-  if (Number.isFinite(factor) && factor > 0) { view.rescale(factor); if (closeUp.back) closeUp.back.dist *= factor; }
+  view.rescale(d => mapDistance(f, d, s0, s));
   // the slider has real scale on the left
   $('scale').value = 1 - s;
   $('scale').setAttribute('aria-valuetext', s === 1 ? 'real scale' : s === 0 ? 'overview' : Math.round((1 - s) * 100) + '% toward the overview');
@@ -294,12 +301,6 @@ function applyNightLight(x) {
   $('night').setAttribute('aria-valuetext', x === 0 ? 'real, dark' : Math.round(x * 100) + '% lit');
   $('nightReal').classList.toggle('on', x === 0);
   $('nightLit').classList.toggle('on', x === 1);
-}
-// heliocentric distance (km) whose drawn distance is `units`, at the current scale
-function helioInverse(units) {
-  let lo = 1e3, hi = 1e12;
-  for (let i = 0; i < 60; i++) { const m = Math.sqrt(lo * hi); if (scale.helio(m) < units) lo = m; else hi = m; }
-  return Math.sqrt(lo * hi);
 }
 
 // ---------------------------------------------------------------- time

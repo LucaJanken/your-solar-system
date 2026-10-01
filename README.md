@@ -65,18 +65,15 @@ GitHub Pages serves the repository as-is.
   the clock shows them (local time, UTC, or UT in Scientific).
 - The clock shows Local time, UTC, or Scientific (UT, with TT, ΔT and the Julian Date); the
   choice is remembered. An Extrapolated tag appears outside the validated 1800–2050.
-- Selecting a body glides the camera over to it without changing zoom or viewing angle (it only
-  backs off if it would end up inside the body). Selecting it again flies straight in to a
-  comfortable view of it, from the same side; a third time, while still that close, flies straight
-  back out to the distance the camera was at before (the one it had when the body was selected, if
-  it had been zoomed in by hand), also after moving on to a body nearby, or, with no such distance,
-  to the body's surroundings (a moon's planet, a planet's moons; for the Sun, the whole system, seen
-  from a little above the ecliptic). Otherwise neither flight turns the view. Zoomed out by hand
-  from the close look, selecting it flies in again, and the next time back out to where it was
-  zoomed out to.
-  Selecting it during either flight turns the camera round. In the view, a body's dot under the pointer is chosen before
-  a label beside it. Lock keeps the camera travelling with the selected body; locking again after
-  drifting catches up with it. Spin axis shows its rotation axis.
+- Selecting a body glides the camera over to it, keeping zoom and viewing angle, but no nearer
+  than a comfortable view of it (its close look: Earth's close look would be inside Jupiter).
+  Selecting it again, once it is centred, flies straight to the close look without turning the
+  view: in, or back out if zoomed in nearer by hand; already there, it does nothing. Zooming out
+  is left to the wheel or a pinch (`Esc`: the whole system). Nothing is remembered between
+  choices. A change of scale keeps a close look, a planet's moons in view and the whole system as
+  they are, and whatever lies between in proportion. In the view, a body's dot under the pointer
+  is chosen before a label beside it. Lock keeps the camera travelling with the selected body;
+  locking again after drifting catches up with it. Spin axis shows its rotation axis.
 - Dragging (one finger) turns the view around the focus; scroll or pinch zooms. The wheel eases each
   step in, and its steps grow (up to 8×) the faster it is turned, so a quick spin crosses from a
   close look to the whole system. Moving the view sideways (right- or shift-drag, arrow keys,
