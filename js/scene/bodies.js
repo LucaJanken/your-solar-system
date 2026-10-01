@@ -74,7 +74,7 @@ export class BodyViews {
     this.scene = scene;
     this.loader = new THREE.TextureLoader();
     this.aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-    this.shared = shared;   // { nightOn: {value} }
+    this.shared = shared;   // { nightOn: {value}, bright: {value} }
     this.onChange = () => {};   // called when something finishes loading
     this.views = {};
     for (const def of BODIES) this.views[def.name] = this.create(def);
@@ -118,14 +118,14 @@ export class BodyViews {
     const extinction = def.atmosphere && def.atmosphere.tauZenith;
     v.nightU = t.night ? { value: null } : null;
     v.pending = !!(t.map || t.night || t.clouds || t.rough);
-    patchBodyMaterial(mat, u, { blur: !!t.map, night: v.nightU, nightOn: this.shared.nightOn, lunar: def.photometry === 'lunar', extinction });
+    patchBodyMaterial(mat, u, { blur: !!t.map, night: v.nightU, nightOn: this.shared.nightOn, bright: this.shared.bright, lunar: def.photometry === 'lunar', extinction });
     v.mesh = new THREE.Mesh(new THREE.SphereGeometry(1, ...seg), mat);
     v.mesh.userData.name = def.name;
     orient.add(v.mesh);
 
     if (t.clouds) {
       const cm = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, depthWrite: false, roughness: 1 });
-      patchBodyMaterial(cm, u, { extinction });
+      patchBodyMaterial(cm, u, { extinction, bright: this.shared.bright });
       v.clouds = new THREE.Mesh(new THREE.SphereGeometry(1, ...seg), cm);
       v.clouds.visible = false;
       orient.add(v.clouds);

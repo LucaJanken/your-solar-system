@@ -160,10 +160,12 @@ const VARYINGS = 'varying vec3 vOmRel;\nvarying vec3 vOmUnit;\n';
  * opts.blur: enable rotation blur of the colour map (used when the body spins faster than the frame rate can show)
  * opts.lunar: airless regolith photometry (see below) instead of Lambert's law
  * opts.extinction: [τR, τG, τB] zenith optical depth of an atmosphere that the sunlight crosses
+ * opts.bright: uniform { value } of the Night sides slider's light (0: off)
  */
 export function patchBodyMaterial(mat, u, opts = {}) {
   mat.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, u);
+    sh.uniforms.uBright = opts.bright || { value: 0 };
     if (opts.night) { sh.uniforms.uNight = opts.night; sh.uniforms.uNightOn = opts.nightOn; }
     // The mesh's flat facets lie up to 5 km (Earth, 96 × 64 segments) inside the true surface, and
     // at a low Sun that moves a shadow computed there sideways by 5 km · cot(altitude): 30 km at 10°.
@@ -173,7 +175,7 @@ export function patchBodyMaterial(mat, u, opts = {}) {
     sh.vertexShader = VARYINGS + 'uniform float uPhysScale;\n' + sh.vertexShader.replace(
       '#include <begin_vertex>',
       '#include <begin_vertex>\n  vOmRel = mat3(modelMatrix) * transformed * uPhysScale;\n  vOmUnit = transformed;');
-    let frag = VARYINGS + COMMON + 'uniform float uBlurU;\nuniform int uBlurN;\n';
+    let frag = VARYINGS + COMMON + 'uniform float uBlurU;\nuniform int uBlurN;\nuniform float uBright;\n';
     if (opts.night) frag += 'uniform sampler2D uNight;\nuniform float uNightOn;\n';
     let body = sh.fragmentShader;
     if (opts.blur) {
@@ -224,7 +226,11 @@ export function patchBodyMaterial(mat, u, opts = {}) {
   vec3 omP = vOmRel / length(vOmUnit);   // on the true surface (see the vertex shader)
   vec3 omLight = omSunlight(omP);${ext}
   reflectedLight.directDiffuse *= omLight;
-  reflectedLight.directSpecular *= omLight;${lunar}`);
+  reflectedLight.directSpecular *= omLight;${lunar}
+  // The Night sides slider (off by default; not physical): a dim light from the viewer's direction, so
+  // the side facing the camera is lit, night sides and eclipse shadows included, with Lambert
+  // shading that keeps the body round. Added after the shadows, so it never changes them.
+  reflectedLight.indirectDiffuse += uBright * max(dot(normal, geometryViewDir), 0.0) * BRDF_Lambert(material.diffuseColor);`);
     if (opts.night) {
       // (only once the day map has loaded: it provides the texture coordinates)
       body = body.replace('#include <opaque_fragment>', /* glsl */`

@@ -103,23 +103,25 @@ button.chip:hover { color: var(--text); }
 .tab[aria-expanded="true"] { color: var(--accent-text); box-shadow: inset 0 -2px var(--accent); }
 .tab-ic { display: block; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
 .tab-tx { font: 500 10px/1 var(--serif); letter-spacing: 0.08em; text-transform: uppercase; }
-/* the bottom padding evens the settings and the list (--set-pad, --list-pad: evenPanes in main.js) */
+/* the bottom padding makes the settings at least as tall as the list (--set-pad: evenPanes in main.js) */
 .settings { padding: 11px 0 calc(12px + var(--set-pad, 0px)); }
 .settings h2 { padding: 0 12px 6px; }
-.sw { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; border: 0; background: none; padding: 7px 12px; font: 500 12px/1.2 var(--serif); letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); text-align: left; }
-.sw:hover { background: rgb(var(--ink-rgb) / 0.05); color: var(--text-2); }
-.sw i { position: relative; flex: none; width: 24px; height: 13px; border: 1px solid var(--line-strong); border-radius: 7px; transition: background 0.15s, border-color 0.15s; }
-.sw i::after { content: ''; position: absolute; top: 2px; left: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); transition: transform 0.15s, background 0.15s; }
-.sw[aria-checked="true"] { color: var(--text); }
-.sw[aria-checked="true"] i { border-color: oklch(var(--accent-lch) / 0.6); background: var(--accent-soft); }
-.sw[aria-checked="true"] i::after { transform: translateX(11px); background: var(--accent); }
-.settings .scale-title { margin-top: 10px; padding-top: 11px; border-top: 1px solid var(--line); }
-.settings #scale { display: block; width: calc(100% - 24px); margin: 0 12px; }
-.scale-ends { display: flex; justify-content: space-between; padding: 0 12px; }
-.scale-ends button { border: 0; background: none; padding: 2px 0; font: 500 12px/1 var(--serif); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); }
-.scale-ends button:hover, .scale-ends button.on { color: var(--accent-text); }
+/* a settings row: its label, then a tick box at the right edge; the whole row is the button */
+.check { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; border: 0; background: none; padding: 7px 12px; font: 500 12px/1.2 var(--serif); letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); text-align: left; }
+.check:hover { background: rgb(var(--ink-rgb) / 0.05); color: var(--text-2); }
+.check i { position: relative; flex: none; width: 11px; height: 11px; border: 1px solid var(--line-strong); border-radius: 1px; transition: border-color 0.15s; }
+.check i::after { content: ''; position: absolute; left: 3px; top: 0; width: 3px; height: 7px; border: solid var(--accent); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); opacity: 0; transition: opacity 0.15s; }
+.check[aria-checked="true"] { color: var(--text); }
+.check[aria-checked="true"] i { border-color: oklch(var(--accent-lch) / 0.6); }
+.check[aria-checked="true"] i::after { opacity: 1; }
+.settings .slider-title { margin-top: 14px; }
+.settings .slider-title.first { margin-top: 10px; padding-top: 11px; border-top: 1px solid var(--line); }
+.settings input[type=range] { display: block; width: calc(100% - 24px); margin: 0 12px; }
+.slider-ends { display: flex; justify-content: space-between; padding: 0 12px; }
+.slider-ends button { border: 0; background: none; padding: 2px 0; font: 500 12px/1 var(--serif); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); }
+.slider-ends button:hover, .slider-ends button.on { color: var(--accent-text); }
 
-.bodies ul { list-style: none; margin: 0; padding: 4px 0 calc(6px + var(--list-pad, 0px)); }
+.bodies ul { list-style: none; margin: 0; padding: 4px 0 6px; }
 .body-item { display: flex; border-left: 2px solid transparent; }
 .body-item.cur { border-left-color: var(--accent); background: var(--accent-soft); }
 .body-btn { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; border: 0; background: transparent; padding: 7px 8px 7px 12px; text-align: left; font: 500 13px/1 var(--serif); letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-2); }
@@ -317,9 +319,11 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
   #bodyList, .settings { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
   .chip { height: 26px; padding: 0 9px; }
   .icon-chip svg { width: 17px; height: 17px; }
-  .sw { padding: 10px 14px; font-size: 13px; }
+  /* the type and padding of the planet names on the Bodies tab, so the two tabs match; with the
+     tick box this leaves a label 83 px in the 132 px panel (Sun glare, the longest, is 77) */
+  .check { padding: 11px 14px; line-height: 1; letter-spacing: 0.08em; }
   /* True and Overview share a 106 px row: smaller, so a clear gap stays between them */
-  .scale-ends button { font-size: 10px; letter-spacing: 0.06em; }
+  .slider-ends button { font-size: 10px; letter-spacing: 0.06em; }
   /* finger-sized rows */
   /* Garamond's capitals are wide: tighter spacing, and a narrower arrow, keep the names clear of it */
   .body-btn { padding: 11px 8px 11px 14px; font-size: 12px; letter-spacing: 0.08em; }

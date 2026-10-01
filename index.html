@@ -65,16 +65,26 @@
       <!-- the Settings tab shows them here, in place of the list -->
       <section class="settings" id="settings" hidden aria-label="Settings">
         <h2>View</h2>
-        <button type="button" class="sw" role="switch" data-toggle="orbits" aria-checked="true">Orbits<i></i></button>
-        <button type="button" class="sw" role="switch" data-toggle="labels" aria-checked="true">Labels<i></i></button>
-        <button type="button" class="sw" role="switch" data-toggle="moons" aria-checked="true">Moons<i></i></button>
-        <button type="button" class="sw" role="switch" data-toggle="stars" aria-checked="true">Stars<i></i></button>
-        <button type="button" class="sw" role="switch" data-toggle="lock" aria-checked="true" title="Lock the camera to the selected body, so it travels with it">Lock<i></i></button>
-        <button type="button" class="sw" role="switch" data-toggle="axis" aria-checked="true" title="Show the selected body's rotation axis">Axis<i></i></button>
-        <h2 class="scale-title" id="scaleTitle">Scale</h2>
-        <!-- true scale on the left, the overview on the right (the input's value is 1 − scale) -->
+        <!-- what is drawn on and around the bodies, the sky, the light, then the camera. On phones a
+             label has about 83 px beside its box (see .check in style.css): about nine letters -->
+        <button type="button" class="check" role="checkbox" data-toggle="orbits" aria-checked="true">Orbits<i></i></button>
+        <button type="button" class="check" role="checkbox" data-toggle="labels" aria-checked="true">Labels<i></i></button>
+        <button type="button" class="check" role="checkbox" data-toggle="moons" aria-checked="true">Moons<i></i></button>
+        <button type="button" class="check" role="checkbox" data-toggle="axis" aria-checked="true">Spin axis<i></i></button>
+        <button type="button" class="check" role="checkbox" data-toggle="stars" aria-checked="true">Stars<i></i></button>
+        <button type="button" class="check" role="checkbox" data-toggle="milkyWay" aria-checked="true">Milky Way<i></i></button>
+        <button type="button" class="check" role="checkbox" data-toggle="glare" aria-checked="true">Sun glare<i></i></button>
+        <button type="button" class="check" role="checkbox" data-toggle="cities" aria-checked="true">Cities<i></i></button>
+        <button type="button" class="check" role="checkbox" data-toggle="lock" aria-checked="true">Lock<i></i></button>
+        <!-- the sliders: reality at the left end of each, a clearer but less real view to the right -->
+        <h2 class="slider-title first" id="scaleTitle">Scale</h2>
+        <!-- real scale on the left, the overview on the right (the input's value is 1 − scale) -->
         <input type="range" id="scale" min="0" max="1" step="0.001" value="0" aria-labelledby="scaleTitle">
-        <div class="scale-ends"><button type="button" id="scaleMax">True</button><button type="button" id="scaleMin">Overview</button></div>
+        <div class="slider-ends"><button type="button" id="scaleMax">Real</button><button type="button" id="scaleMin">Overview</button></div>
+        <!-- night sides black as the Sun leaves them on the left, lit by a light from the viewer to the right -->
+        <h2 class="slider-title" id="nightTitle">Night sides</h2>
+        <input type="range" id="night" min="0" max="1" step="0.01" value="0" aria-labelledby="nightTitle">
+        <div class="slider-ends"><button type="button" id="nightReal">Real</button><button type="button" id="nightLit">Lit</button></div>
       </section>
     </div>
   </div>
@@ -146,7 +156,7 @@
       <li><b>Run time.</b> The round button plays and pauses time. The speed slider beside it runs from real time on the left to years per second on the right, and the clock with the circular arrow runs time backward.</li>
       <li><b>Jump in time.</b> The calendar button goes to any date from 1000 to 2999, and <b>Now</b> comes back to the present.</li>
       <li><b>Eclipses and transits</b>, the button between the calendar and Now, lists past and coming events. Choose one to watch it.</li>
-      <li><b>Settings</b>, the tab beside Bodies, turn orbits, labels, moons, the stars and the Milky Way, and the rotation axis on and off, set <b>Lock</b>, and hold the <b>Scale</b> slider, from true scale to an overview.</li>
+      <li><b>Settings</b>, the tab beside Bodies, turn orbits, labels, moons, the spin axis, the stars, the Milky Way, the Sun’s glare and Earth’s city lights on and off, and set <b>Lock</b>. Below them, two sliders have reality at their left end: <b>Scale</b> runs from the real scale to an overview, and <b>Night sides</b> from real, dark night sides to lit ones. All are kept for your next visit.</li>
       <li><b>Hide the interface</b> with the eye beside the clock’s time zone to see only the sky; click or tap empty space to bring it back. Turning, zooming and choosing bodies keep working meanwhile.</li>
     </ul>
     <dl class="keys">
@@ -154,7 +164,7 @@
       <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>slower / faster (the speed slider one step)</dd>
       <dt><kbd>R</kbd></dt><dd>reverse time</dd>
       <dt><kbd>N</kbd></dt><dd>now</dd>
-      <dt><kbd>T</kbd></dt><dd>overview ↔ true scale</dd>
+      <dt><kbd>T</kbd></dt><dd>overview ↔ real scale</dd>
       <dt><kbd>H</kbd></dt><dd>hide / show the interface</dd>
       <dt><kbd>Esc</kbd></dt><dd>back to the whole system</dd>
     </dl>
@@ -168,13 +178,14 @@
         <li>The speed slider runs from real time (1×) at its left end to about five years per second at its right. Up to 60× the speed is shown as a multiple of real time, faster as simulated time per second (“5 min/s”, “2 d/s”, “1 yr/s”). <b>Play</b> and <b>Pause</b> keep the chosen speed: paused, it is shown dimmed. Running backward keeps the speed too, and marks it with a −.</li>
         <li>The calendar takes dates in the time the clock shows (local or UTC). On a phone it opens the phone’s own date picker; on a computer type or pick a date and press <b>Set</b> (or <kbd>Enter</kbd>).</li>
         <li>The button above the clock switches between <b>Local</b> time, <b>UTC</b> and <b>Scientific</b>, which shows Universal Time (UT, Earth’s rotation, UT1) and adds TT (the uniform time the planets move by), ΔT = TT − UT and the Julian Date. The model takes UTC to be UT1; the two never differ by more than 0.9 s.</li>
+        <li><b>Night sides</b> (in the settings) adds a light from where you are looking, so night sides and the dark of an eclipse show their surface; the further right, the brighter. It is not real light: the shadows themselves stay exactly where they are. At <b>Real</b>, night sides are black as a camera exposed for daylight sees them; your eye, adapted to the dark, would see the Moon’s dark side faintly lit by Earth (earthshine). <b>Sun glare</b> turns off the glare around the Sun, which helps to see what lies close to it, such as a planet crossing the Sun’s disc.</li>
         <li>The information panel starts folded down to the body’s name: tap it (or <b>+</b>) to open it, and <b>–</b> folds it again. On a phone or an upright tablet, tap an open panel to show all of its data.</li>
       </ul>
     </details>
 
     <details>
-      <summary>Overview and true scale</summary>
-      <p>At <b>true scale</b> the Solar System is almost entirely empty: if the Sun were a grapefruit, Earth would be a grain of sand 13 m away and Neptune 390 m away. This is how the model opens. The <b>overview</b> shrinks distances and enlarges bodies so everything fits on one screen, and the <b>Scale</b> slider in the settings morphs smoothly between the two, from true scale on the left to the overview on the right. Directions are never distorted, so alignments such as eclipses and conjunctions look right at every setting. Bodies too small to see are marked by their labels; hovering over one circles it.</p>
+      <summary>Overview and real scale</summary>
+      <p>At <b>real scale</b> the Solar System is almost entirely empty: if the Sun were a grapefruit, Earth would be a grain of sand 13 m away and Neptune 390 m away. This is how the model first opens. The <b>overview</b> shrinks distances and enlarges bodies so everything fits on one screen, and the <b>Scale</b> slider in the settings morphs smoothly between the two, from real scale on the left to the overview on the right. Directions are never distorted, so alignments such as eclipses and conjunctions look right at every setting. Bodies too small to see are marked by their labels; hovering over one circles it.</p>
     </details>
 
     <details>
@@ -205,7 +216,7 @@
 
     <details>
       <summary>What the picture shows</summary>
-      <p>The Sun is the only light, so night sides are black, as a camera exposed for daylight sees them; Earth’s night side shows its city lights. Distant worlds are brightened so they stay visible (Neptune receives 1/900 of the sunlight Earth does).</p>
+      <p>The Sun is the only light, so night sides are black, as a camera exposed for daylight sees them (the <b>Night sides</b> slider in the settings lights them); Earth’s night side shows its city lights. Distant worlds are brightened so they stay visible (Neptune receives 1/900 of the sunlight Earth does).</p>
       <p>The Sun’s disc is drawn as it looks in white light through a filter: featureless, darker and redder toward its edge. Around it is the glare it would cause in an eye or a camera exposed for the planets, which drowns the nearby stars; it fades as the disc grows large, as it does in a close or telescope view. Its fine radial streaks are light scattered inside the eye’s lens, and like the real ones they change as you look around. Behind the stars lies the faint glow of the Milky Way, with the Magellanic Clouds and the Andromeda galaxy.</p>
       <p>Earth’s atmosphere is a thin blue haze toward the limb, lit only where sunlight reaches it. The Moon and other dusty airless worlds scatter light back toward the Sun, so a full Moon is evenly bright to its edge instead of shading like a ball. Every moon turns according to the IAU rotation models, including the slight rocking (libration) that keeps the Moon from showing exactly the same face.</p>
       <p>Each orbit line is the ellipse the body would follow if nothing but its primary pulled on it, fitted to its motion at this instant. Earth’s is the ellipse of the Earth–Moon pair’s centre of mass (4,700 km from Earth’s centre, inside the Earth), drawn through Earth’s centre: Earth itself weaves a few thousand km to either side of it every month. From Saturn outward the ellipses are drawn around the Solar System’s centre of mass, which the Sun itself circles because of Jupiter’s pull.</p>

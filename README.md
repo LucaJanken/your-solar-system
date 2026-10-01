@@ -14,7 +14,7 @@ Everything on screen is computed for the displayed instant rather than animated 
   of eclipses and transits of Mercury and Venus takes you to any of them.
 - **The sky behind.** 9,096 stars from the Yale Bright Star Catalogue, moved by their proper motion,
   over the Milky Way.
-- **True scale to overview.** It opens at true scale, with the whole system out to Neptune's orbit
+- **Real scale to overview.** It opens at real scale, with the whole system out to Neptune's orbit
   in view; the Scale slider in the settings morphs to a compressed overview where every body is visible, without ever
   distorting directions.
 
@@ -37,8 +37,14 @@ GitHub Pages serves the repository as-is.
 - Below 960 px wide (phones, and tablets held upright: iPad mini to iPad Pro 11") or 480 px tall,
   the compact phone layout is used ("on phones" in this list), as the information panel and the
   time controls no longer fit side by side.
-- The settings switch Orbits, Labels, Moons, Stars (the stars and the Milky Way), Lock and Axis,
-  and hold the Scale slider (True, i.e. true scale, on the left, the overview on the right).
+- The settings are tick boxes: Orbits, Labels, Moons, Spin axis, Stars, Milky Way, Sun glare,
+  Cities (Earth's night lights) and Lock, then two sliders with reality at their left end, labelled
+  Real: Scale (real scale to the overview, Overview) and Night sides (black, as the Sun alone
+  leaves them, to Lit: a light from the viewer that shows night sides and eclipse shadows, not
+  physical, and leaving the shadows themselves unchanged). The ends' labels set the slider there.
+  All are kept across reloads (`localStorage`); a scale in the URL hash overrides the saved one.
+  On phones a label has about 83 px beside its box (12 px type, the Bodies list's), about nine
+  letters: check a new label's width before adding it.
 - The bottom bar: a round Play/Pause button, a reverse button (a clock with a circular arrow, lit
   while time runs backward; `R`), the speed slider, the calendar, Eclipses & transits and Now. The
   slider is logarithmic and forward-only, from real time on the left to about 5 years per second on
@@ -65,7 +71,7 @@ GitHub Pages serves the repository as-is.
   time back out to where it was zoomed out to.
   Selecting it during either flight turns the camera round. In the view, a body's dot under the pointer is chosen before
   a label beside it. Lock keeps the camera travelling with the selected body; locking again after
-  drifting catches up with it. Axis shows its spin axis.
+  drifting catches up with it. Spin axis shows its rotation axis.
 - Dragging (one finger) turns the view around the focus; scroll or pinch zooms. The wheel eases each
   step in, and its steps grow (up to 8×) the faster it is turned, so a quick spin crosses from a
   close look to the whole system. Moving the view sideways (right- or shift-drag, arrow keys,
@@ -101,7 +107,7 @@ js/astro/       the physics, with no graphics:
   events-worker.js  runs those searches off the main thread for the events list
 js/data/        bodies.js: physical data and descriptions, with sources
 js/scene/       three.js rendering
-  scale.js        overview ↔ true-scale mapping; ecliptic → scene axes
+  scale.js        overview ↔ real-scale mapping; ecliptic → scene axes
   bodies.js       meshes, materials, rings, spin axis; per-frame update
   shaders.js      eclipse and ring shadows, lunar-eclipse reddening, rotation blur, regolith
                   photometry, the Sun's photosphere, rings, Earth's atmospheric glow

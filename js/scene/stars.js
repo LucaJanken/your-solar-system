@@ -41,7 +41,8 @@ export class Stars {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10);
     this.epochYear = null;
-    this.visible = true;
+    this.showStars = true;      // the catalogue's stars
+    this.showMilkyWay = true;   // the diffuse background
     this.glare = { uDim: { value: 0 }, uSunDir: { value: new THREE.Vector3(1, 0, 0) } };
     this.milkyWay();
     this.ready = fetch('data/stars.bin').then(r => r.arrayBuffer()).then(buf => this.build(buf)).catch(e => console.warn('stars', e));
@@ -148,7 +149,9 @@ export class Stars {
   setGlare(amount, dir) { this.glare.uDim.value = amount; this.glare.uSunDir.value.copy(dir); }
 
   render(renderer, mainCamera, pixelRatio) {
-    if (!this.visible) return;
+    if (!this.showStars && !this.showMilkyWay) return;
+    if (this.points) this.points.visible = this.showStars;
+    this.sky.visible = this.showMilkyWay;
     this.camera.quaternion.copy(mainCamera.quaternion);
     // the same projection as the main camera, including its view offset (see main.js)
     const v = mainCamera.view && mainCamera.view.enabled ? mainCamera.view : null, off = v ? v.offsetY / v.fullHeight : 0;

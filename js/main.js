@@ -31,7 +31,10 @@ const state = {
   playing: !REDUCED_MOTION,
   speed: 0,          // log10 |simulated seconds per real second|: 0 is real time
   dir: 1,            // +1 forward, −1 backward (the reverse button)
-  show: { orbits: true, labels: true, moons: true, stars: true, axis: true },
+  // the switches in the settings (with view.lock, the scale and nightLight, kept across reloads: see saveSettings)
+  show: { orbits: true, labels: true, moons: true, axis: true, stars: true, milkyWay: true, glare: true, cities: true },
+  nightLight: 0,     // the Night sides slider: 0 real (black), 1 lit
+
   scaleTarget: 1,
   selected: 'Sun',
 };
@@ -48,11 +51,18 @@ const camera = new THREE.PerspectiveCamera(45, 1, 1e-6, 1e7);
 const DEFAULT_FOV = 45;
 
 // The Sun is the only light, so night sides are black, as a camera exposed for daylight sees them.
-// Decay 0 keeps distant worlds visible (see the guide).
+// Decay 0 keeps distant worlds visible (see the guide). The Night sides slider adds a dim light from
+// the viewer (shaders.js), outside the shadow computation.
 const sunLight = new THREE.PointLight(0xfff6ea, SUN_INTENSITY, 0, 0);
 scene.add(sunLight);
 
-const shared = { nightOn: { value: 1 } };
+// uniforms of every body material, set from the settings: Earth's city lights, and the Night sides light
+const shared = { nightOn: { value: 1 }, bright: { value: 0 } };
+// The Night sides light at the slider's right end, in the sunlight's units: at normal incidence 30%
+// of SUN_INTENSITY (3.4). Squared along the slider: the sRGB encoding (about light^(1/2.2)) then
+// makes equal steps of the slider look about equally bright, where a linear light would jump at
+// the start and barely change toward the end.
+const NIGHT_LIGHT_MAX = 1.0;
 const scale = new DisplayScale();
 const bodies = new BodyViews(scene, renderer, shared);
 const orbits = new Orbits(scene);
@@ -257,6 +267,7 @@ function setScale(s, animate = true) {
   wake();
   s = Math.max(0, Math.min(1, s));
   state.scaleTarget = s;
+  saveSettings();
   if (animate && !REDUCED_MOTION) scaleAnim = { from: scale.s, to: s, t0: performance.now(), ms: 2200 };
   else { scaleAnim = null; applyScale(s); }
 }
@@ -271,11 +282,30 @@ function applyScale(s) {
   else if (cd > before.n) factor = scale.helio(NEPTUNE_KM) / before.n;
   else factor = scale.helio(before.d) / cd;
   if (Number.isFinite(factor) && factor > 0) { view.rescale(factor); if (closeUp.back) closeUp.back.dist *= factor; }
-  // the slider has true scale on the left
+  // the slider has real scale on the left
   $('scale').value = 1 - s;
-  $('scale').setAttribute('aria-valuetext', s === 1 ? 'true scale' : s === 0 ? 'overview' : Math.round((1 - s) * 100) + '% toward the overview');
+  $('scale').setAttribute('aria-valuetext', s === 1 ? 'real scale' : s === 0 ? 'overview' : Math.round((1 - s) * 100) + '% toward the overview');
   $('scaleMin').classList.toggle('on', s === 0);
   $('scaleMax').classList.toggle('on', s === 1);
+}
+// The Night sides slider: 0 leaves them as the Sun does (black), 1 lights them fully. Like the
+// scale, state.nightLight is where it is going (saved), nightShown what is drawn; the end labels
+// glide there, as Real and Overview do.
+let nightAnim = null, nightShown = 0;
+function setNightLight(x, animate = false) {
+  wake();
+  x = Math.max(0, Math.min(1, x));
+  state.nightLight = x;
+  if (animate && !REDUCED_MOTION) nightAnim = { from: nightShown, to: x, t0: performance.now(), ms: 2200 };
+  else { nightAnim = null; applyNightLight(x); }
+  saveSettings();
+}
+function applyNightLight(x) {
+  nightShown = x;
+  $('night').value = x;
+  $('night').setAttribute('aria-valuetext', x === 0 ? 'real, dark' : Math.round(x * 100) + '% lit');
+  $('nightReal').classList.toggle('on', x === 0);
+  $('nightLit').classList.toggle('on', x === 1);
 }
 // heliocentric distance (km) whose drawn distance is `units`, at the current scale
 function helioInverse(units) {
@@ -312,7 +342,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const elapsed = (now - last) / 1000, dt = Math.min(0.1, elapsed);
   last = now;
-  const active = state.playing || view.tween || view.zoomLeft || scaleAnim || now < wakeUntil || viewShift !== shiftTarget;
+  const active = state.playing || view.tween || view.zoomLeft || scaleAnim || nightAnim || now < wakeUntil || viewShift !== shiftTarget;
   if (!active) {
     if (hudDirty) { lastHud = now; hudDirty = false; updateHud(); }
     return;
@@ -333,6 +363,11 @@ function frame(now) {
     // interpolate in the exponent, so the morph looks even across the ~5 decades of change
     applyScale(scaleAnim.from + (scaleAnim.to - scaleAnim.from) * e);
     if (k >= 1) scaleAnim = null;
+  }
+  if (nightAnim) {
+    const k = Math.min(1, (now - nightAnim.t0) / nightAnim.ms), e = k * k * (3 - 2 * k);
+    applyNightLight(nightAnim.from + (nightAnim.to - nightAnim.from) * e);
+    if (k >= 1) nightAnim = null;
   }
   computeDisplay();
   view.update(disp, drawnExtent(view.focus), maxDistance());
@@ -356,7 +391,10 @@ function frame(now) {
   sunLight.position.set(-origin[0], -origin[1], -origin[2]);
 
   stars.setEpoch((snap.tt) / 365.25);
-  stars.visible = state.show.stars;
+  stars.showStars = state.show.stars;
+  stars.showMilkyWay = state.show.milkyWay;
+  shared.nightOn.value = state.show.cities ? 1 : 0;
+  shared.bright.value = NIGHT_LIGHT_MAX * nightShown ** 2;
 
   // labels (and screen positions for picking)
   const W = stage.clientWidth, H = stage.clientHeight;
@@ -393,9 +431,10 @@ function frame(now) {
   if (se && se.onScreen && se.rpx > 350) bodies.upgrade('Earth');
 
   const sunV = bodies.views.Sun;
-  glare.update(camera, sunV.group.position, sunV.R, W, H, renderer.getPixelRatio(),
+  if (state.show.glare) glare.update(camera, sunV.group.position, sunV.R, W, H, renderer.getPixelRatio(),
     BODIES.filter(d => d.parent).map(d => { const v = bodies.views[d.name]; return { pos: v.group.position, R: v.R, visible: v.group.visible }; }),
     REDUCED_MOTION ? 0 : dt);
+  else glare.on = false;
   stars.setGlare(glare.on ? 0.75 * glare.vis * glare.halo : 0, glare.dir);
 
   renderer.clear();
@@ -568,19 +607,20 @@ function setPanel(v, remember = false) {
   evenPanes();
   hudBoxes = null; wake();
 }
-// The list (its planets alone) and the settings are padded at the bottom to the same height, so that
-// switching between them does not move the panel's lower edge; moons opened in the list still
-// lengthen it. Measured, as which of the two is taller depends on the layout (phones have taller
-// rows). scrollHeight is the content's height even where the panel squeezes them (phones).
+// The settings are padded at the bottom to at least the height of the list (its planets alone), so
+// that opening them does not pull the panel's lower edge up; moons opened in the list still lengthen
+// it. The list itself is never padded: where the settings are the taller (they are now, with ten
+// switches), empty space under Pluto would look like a missing entry, so the panel grows instead.
+// scrollHeight is the content's height even where the panel squeezes them (phones).
 function evenPanes() {
   const el = $('bodies'), list = $('bodyList'), set = $('settings'), shown = [list.hidden, set.hidden];
-  el.style.setProperty('--list-pad', '0px'); el.style.setProperty('--set-pad', '0px');
+  el.style.setProperty('--set-pad', '0px');
   list.hidden = set.hidden = false;
   let h = list.scrollHeight;
   for (const li of list.querySelectorAll('.body-item[data-parent]:not([hidden])')) h -= li.offsetHeight;
   const d = set.scrollHeight - h;
   [list.hidden, set.hidden] = shown;
-  el.style.setProperty('--list-pad', Math.max(d, 0) + 'px'); el.style.setProperty('--set-pad', Math.max(-d, 0) + 'px');
+  el.style.setProperty('--set-pad', Math.max(-d, 0) + 'px');
 }
 const openSettings = () => { beforeSettings = panel; setPanel('settings'); };
 let bodiesOpen = !PHONE.matches;
@@ -874,6 +914,28 @@ function paintToggles() {
     const on = k === 'lock' ? view.lock : state.show[k];
     b.setAttribute('aria-checked', on);
   }
+  saveSettings();
+}
+// The settings survive a reload: the switches, Lock, the scale and Night sides. Saved only once startup is
+// over, so neither the defaults painted then nor a view from the URL hash (which overrides the
+// saved scale, readUrl running after restoreSettings) is written back by itself.
+const SETTINGS_KEY = 'solarSystem.settings';
+let settingsRestored = false;
+function saveSettings() {
+  if (!settingsRestored) return;
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ show: state.show, lock: view.lock, scale: state.scaleTarget, night: state.nightLight })); } catch {}
+}
+function restoreSettings() {
+  try {
+    const v = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+    if (v && typeof v === 'object') {
+      // only switches that still exist, so a renamed or removed one falls back to its default
+      if (v.show) for (const k of Object.keys(state.show)) if (typeof v.show[k] === 'boolean') state.show[k] = v.show[k];
+      if (typeof v.lock === 'boolean') view.lock = v.lock;
+      if (Number.isFinite(v.scale)) setScale(v.scale, false);
+      if (Number.isFinite(v.night)) setNightLight(v.night);
+    }
+  } catch {}
 }
 function wire() {
   // anything the user does, and anything that finishes loading, may change the picture
@@ -916,6 +978,9 @@ function wire() {
   $('scale').addEventListener('input', e => setScale(1 - e.target.value, false));
   $('scaleMin').addEventListener('click', () => setScale(0));
   $('scaleMax').addEventListener('click', () => setScale(1));
+  $('night').addEventListener('input', e => setNightLight(+e.target.value));
+  $('nightReal').addEventListener('click', () => setNightLight(0, true));
+  $('nightLit').addEventListener('click', () => setNightLight(1, true));
   $('playBtn').addEventListener('click', () => setPlaying(!state.playing));
   $('revBtn').addEventListener('click', () => setReverse(state.dir > 0));
   $('nowBtn').addEventListener('click', () => setTime(Date.now()));
@@ -1069,7 +1134,10 @@ buildList();
 setPanel(bodiesOpen ? 'bodies' : null);
 wire();
 setTimeMode(timeMode);
+setNightLight(state.nightLight);
+restoreSettings();
 const fromUrl = readUrl();
+settingsRestored = true;
 refreshSnap();
 computeDisplay();
 measureFree();
