@@ -24,7 +24,7 @@ GitHub Pages serves the repository as-is.
 ## Using it
 
 - The top-right corner holds one narrow panel. Its heading has three tabs, each an icon above its
-  name (a ringed planet, a gear, a question mark): Bodies and Settings show their content in the
+  name (a ringed planet, a gear, an open book): Bodies and Settings show their content in the
   panel, and choosing the one shown folds the panel; Guide opens the Guide. On computers the list
   stays as it was left (remembered); on phones the panel starts folded and folds again when the view
   is tapped. Esc closes the settings. On phones the tabs show only their icons, and the panel is only
