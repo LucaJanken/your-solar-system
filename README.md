@@ -160,7 +160,7 @@ Maps 2020 (Hipparcos-2, Tycho-2, Gaia DR2: ESA/Gaia/DPAC) · planet maps from So
 (CC BY 4.0) · moon maps from USGS Astrogeology / NASA / JPL (Europa from the 500 m Voyager–Galileo
 mosaic; Charon's New Horizons and Triton's Voyager 2 global mosaics) and Pluto from NASA / JHUAPL /
 SwRI (public domain) · Saturn's moons from the Cassini global colour maps (NASA/JPL-Caltech/Space
-Science Institute/Lunar and Planetary Institute) · IBM Plex (OFL).
+Science Institute/Lunar and Planetary Institute) · EB Garamond (Georg Duffner) and IBM Plex Mono (OFL).
 
 The Milky Way map was made from `milkyway_2020_4k.exr` (svs.gsfc.nasa.gov/4851) at its full
 4096 × 2048: a floor of 0.002 subtracted, 0.4 (the 99.9th percentile) scaled to white, sRGB-encoded,
@@ -184,6 +184,6 @@ are normalised to remove brightness differences, which erases the two faces of I
 ## License
 
 The code is released under the [MIT License](LICENSE). The vendored libraries, fonts, maps and data
-keep their own licences, listed under Credits above: three.js and Astronomy Engine (MIT), IBM Plex
-(SIL Open Font License), the Solar System Scope planet maps (CC BY 4.0, which requires crediting
+keep their own licences, listed under Credits above: three.js and Astronomy Engine (MIT), EB Garamond
+and IBM Plex Mono (SIL Open Font License), the Solar System Scope planet maps (CC BY 4.0, which requires crediting
 them) and the public-domain NASA / USGS / JPL maps and data.
