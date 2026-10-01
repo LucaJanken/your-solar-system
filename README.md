@@ -115,7 +115,7 @@ js/ui/          info.js: information panel; hud.js: hiding the interface, tellin
 js/main.js      state, main loop, controls
 vendor/         three.js r186 (+ OrbitControls) and astronomy-engine 2.1.19, minified ES modules
 data/stars.bin  9,096 BSC5 stars: RA, Dec, V, B−V, proper motion (int16 each)
-textures/       maps, 2048 × 1024 unless noted; milky_way.jpg is equirectangular in J2000 RA/Dec
+textures/       maps, 2048 × 1024 unless noted; milky_way.jpg is 4096 × 2048, equirectangular in J2000 RA/Dec
 tests/          accuracy checks against JPL Horizons and NASA's eclipse canon
 ```
 
@@ -162,8 +162,10 @@ mosaic; Charon's New Horizons and Triton's Voyager 2 global mosaics) and Pluto f
 SwRI (public domain) · Saturn's moons from the Cassini global colour maps (NASA/JPL-Caltech/Space
 Science Institute/Lunar and Planetary Institute) · IBM Plex (OFL).
 
-The Milky Way map was made from `milkyway_2020_4k.exr` (svs.gsfc.nasa.gov/4851): halved to
-2048 × 1024, a floor of 0.002 subtracted, the 99.9th percentile (0.4) scaled to white, sRGB-encoded.
+The Milky Way map was made from `milkyway_2020_4k.exr` (svs.gsfc.nasa.gov/4851) at its full
+4096 × 2048: a floor of 0.002 subtracted, 0.4 (the 99.9th percentile) scaled to white, sRGB-encoded,
+saved as a quality 80 JPEG (mozjpeg, 4:2:0). Drawn at 2% gain, its compression error on screen is
+under one grey level for 85% of pixels and under two for 97%.
 
 Charon and Triton were box-averaged to 2048 × 1024 from the USGS 300 m and 600 m mosaics (Charon
 turned to put longitude 0 in the middle; Triton's orange-filter channel only, tinted in `bodies.js`),
