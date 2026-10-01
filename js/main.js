@@ -444,7 +444,6 @@ function updateHover() {
   const r = Math.max(s.rpx + 5, 11);
   hoverRing.style.transform = `translate(${s.px - r}px, ${s.py - r}px)`;
   hoverRing.style.width = hoverRing.style.height = 2 * r + 'px';
-  hoverRing.style.borderColor = `color-mix(in oklab, ${BY_NAME[name].color} 55%, white)`;
   hoverRing.classList.add('on');
 }
 
