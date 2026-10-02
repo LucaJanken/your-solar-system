@@ -107,7 +107,7 @@ from `file://`), e.g. `python3 -m http.server`, and open `http://localhost:8000/
 index.html, css/style.css
 js/astro/       the physics, with no graphics:
   ephemeris.js    positions, velocities, spin axes, osculating orbits (one frame: J2000 ecliptic, km)
-  satellites.js   Saturn's moons, Triton, Charon, Phobos, Deimos: orbit models fitted to JPL Horizons
+  satellites.js   Saturn's and Uranus's moons, Triton, Charon, Phobos, Deimos: orbit models fitted to JPL Horizons
   rotation.js     IAU rotation models of the moons (generated from NAIF pck00011)
   deltat.js       ΔT = TT − UT1 from USNO/IERS (generated)
   events.js       eclipse and transit search, as a timeline that grows both ways
@@ -139,7 +139,8 @@ tests/          accuracy checks against JPL Horizons and NASA's eclipse canon
 - every body against JPL Horizons (DE440 and satellite ephemerides) over 1800–2050
   (planets < 25″ as seen from Earth, Moon < 21 km, Galilean moons < 900 km, Titan < 850 km,
   Mimas < 270 km, Enceladus < 100 km, Tethys < 220 km, Dione < 190 km, Rhea < 240 km,
-  Iapetus < 1,400 km, Triton < 100 km, Charon < 1 km, Phobos < 20 km, Deimos < 56 km);
+  Iapetus < 1,400 km, Miranda < 90 km, Ariel < 130 km, Umbriel < 50 km, Titania < 140 km,
+  Oberon < 75 km, Triton < 100 km, Charon < 1 km, Phobos < 20 km, Deimos < 56 km);
 - the greatest-eclipse point and time of four solar eclipses (1919, 1999, 2024, 2027), all within
   5 km and 5 s of NASA's *Five Millennium Canon*;
 - Saturn's ring-plane crossing of 23 Mar 2025, the Laplace resonance of Io, Europa and Ganymede,
@@ -150,7 +151,8 @@ The eclipse checks use the canon's own ΔT formula, so they test geometry; the p
 measured ΔT.
 
 To regenerate the reference data or refit the satellite models:
-`python3 tests/fetch_horizons.py`, then `node tests/fit-satellites.mjs …` (usage in the file header).
+`python3 tests/fetch_horizons.py` (with `--dense` for Saturn's moons, `--wide` for Uranus's, which are
+fitted over 1600–2400), then `node tests/fit-satellites.mjs …` (usage in the file header).
 `python3 tests/make_deltat.py` refreshes ΔT (worth doing once a year, as measurements accumulate);
 `python3 tests/make_rotation.py` rebuilds the moons' rotation models from NAIF's kernel.
 
@@ -171,7 +173,8 @@ Astronomy Engine (Don Cross, MIT) · three.js (MIT) · JPL Horizons · NASA NAIF
 Yale Bright Star Catalogue (CDS) · Milky Way from NASA/GSFC Scientific Visualization Studio, Deep Star
 Maps 2020 (Hipparcos-2, Tycho-2, Gaia DR2: ESA/Gaia/DPAC) · planet maps from Solar System Scope
 (CC BY 4.0) · moon maps from USGS Astrogeology / NASA / JPL (Europa from the 500 m Voyager–Galileo
-mosaic; Charon's New Horizons and Triton's Voyager 2 global mosaics) and Pluto from NASA / JHUAPL /
+mosaic; Charon's New Horizons and Triton's Voyager 2 global mosaics; Uranus's moons from the Voyager 2
+mosaics by Tammy Becker, USGS, with JPL) and Pluto from NASA / JHUAPL /
 SwRI (public domain) · Saturn's moons from the Cassini global colour maps (NASA/JPL-Caltech/Space
 Science Institute/Lunar and Planetary Institute) · EB Garamond (Georg Duffner) and IBM Plex Mono (OFL).
 
@@ -183,6 +186,13 @@ under one grey level for 85% of pixels and under two for 97%.
 Charon and Triton were box-averaged to 2048 × 1024 from the USGS 300 m and 600 m mosaics (Charon
 turned to put longitude 0 in the middle; Triton's orange-filter channel only, tinted in `bodies.js`),
 with the unmapped polar cap filled with the mean of the mapped surface.
+
+Uranus's five large moons come from the USGS / JPL Voyager 2 mosaics (Tammy Becker), as NASA
+publishes them for 3D models (science.nasa.gov/3d-resources), kept at their 1440 × 720, which is as
+fine as Voyager saw them. Voyager 2 passed in 1986 near Uranus's southern summer solstice, so only
+the moons' southern halves (31–38% of each surface, up to about the equator) were ever imaged: a
+2-pixel dark fringe along the mosaics' edges and their enclosed gaps was cut away, and the rest
+filled with the mean of the mapped surface (in linear light, weighted by area), blended over 1.5°.
 
 Europa's unmapped south polar cap (south of 86°S, black in the USGS mosaic) was filled the same way,
 and a one-pixel seam down the middle of the Europa and Ganymede maps was interpolated away.

@@ -18,12 +18,24 @@
 //   AUTO=8 TERMS=L4039,L1418.92 node tests/fit-satellites.mjs 604 2.736914742 x $S           # Dione
 //   AUTO=8 node tests/fit-satellites.mjs 605 4.517500436 x $S                                # Rhea
 //   AUTO=10 TERMS=L80.5159,R80.5159,L79.92,Z79.92,L78.75,R78.75 node tests/fit-satellites.mjs 608 79.3302 x $S   # Iapetus
+// Uranus's moons are fitted over 1600–2400, all Horizons has (python3 tests/fetch_horizons.py --wide …):
+// their longitudes carry terms of centuries that 250 years cannot pin down (see satellites.js). The
+// terms were found in passes: AUTO with PMIN=1 over 1800–2050 for the short ones, then over 1600–2400
+// with PMIN=1000 PMAX=150000 for the long ones (Miranda, Ariel, Umbriel) and PMIN=1 PMAX=1000 for more
+// short ones (Umbriel, Titania, Oberon, on a random 6,000 of the 12,000 times, to halve the scans; a
+// rerun on all of them may differ slightly).
+//   export REF=tests/horizons-wide U=0.0117312
+//   TERMS=L4583.6183,L2292.4510,L1527.7227,L1.6092,R1.6091,L95961.1093,L95957.0998,L2545319.1473,L4598.3995,L4567.6308,L2295.4969,L2286.9856,L157921.6216 node tests/fit-satellites.mjs 705 1.41347925 x $U   # Miranda
+//   TERMS=L2.5204,L4587.8291,R2.5201,Z2.5203,L2.5205,R2.5205,L3.2162,Z2.5194,Z2.5203,L2291.5789,L106261.6347,L105660.7969,L902677.3220,L99996.5055,L92891.6423,L4600.4315,L4562.7520,L1528.2865 node tests/fit-satellites.mjs 701 2.52037935 x $U   # Ariel
+//   TERMS=L3.9545,L4583.1719,R3.9545,L4.1442,L4.1450,L4.1445,R4.1442,Z4.1442,R4.1450,R4.1445,L6.4324,L86.2518,L314169.0298,L261157.5113,L510556.4096,L2291.5691,Z4.1439,Z4.1441,L3.2162,L7.9091,R3.2162,L214.0705,Z4.1434,R6.4324 node tests/fit-satellites.mjs 702 4.1441772 x $U   # Umbriel
+//   TERMS=L8.7061,L8.2125,L8.7071,R8.7061,R8.2125,L12.3187,R8.7071,L8.7075,L24.6374,R12.3187,R8.7075,Z8.7059,L144.5557,Z8.7057,Z8.7043,L6.1593,L7.9091,R24.6374,R6.1593,L144.4534,R7.9091,Z8.7009,Z8.7108 node tests/fit-satellites.mjs 703 8.7058717 x $U   # Titania
+//   TERMS=L13.4638,L12.3187,R13.4638,L13.4663,R12.3187,R13.4663,L24.6374,Z13.4632,L13.4672,L144.5556,L8.2125,R24.6374,Z13.4607,R13.4672,Z13.4514,R8.2125,Z13.4751,L144.4533,Z13.4594,L144.8412,L6.1594,R6.1593 node tests/fit-satellites.mjs 704 13.4632389 x $U   # Oberon
 // Each term is a type and a seed period in days: L adds to the mean longitude, R scales the radius,
 // Z moves the moon out of its orbital plane. Amplitudes and frequencies are fitted. The seeds are the
 // resonances (Mimas–Tethys: 71 years and its third harmonic; Enceladus–Dione: 11 and 3.9 years) and,
 // for Iapetus, the Sun's terms at its orbital frequency ± once and twice Saturn's. With AUTO=n the
 // fit then adds n more terms itself, one at a time: each is the strongest peak of the residuals'
-// periodogram (along-track → L, radial → R, cross-track → Z, periods ≥ PMIN days), after which
+// periodogram (along-track → L, radial → R, cross-track → Z, periods PMIN … PMAX days), after which
 // everything is refitted. The TERMS it ends with are printed, to be pasted back for a rerun.
 //
 // Levenberg–Marquardt on all 3-D positions, seeded from osculating elements. Prints the RMS and
@@ -32,7 +44,7 @@ import fs from 'fs';
 const REF = process.env.REF || new URL('./horizons-full', import.meta.url).pathname, D = Math.PI / 180, J2000 = 2451545.0;
 const [key, P0] = [process.argv[2], +process.argv[3]];
 const NP = (+process.argv[5] || 0) * Math.PI / 180;
-const PMIN = +(process.env.PMIN || 60), AUTO = +(process.env.AUTO || 0);
+const PMIN = +(process.env.PMIN || 60), PMAX = +(process.env.PMAX || 30000), AUTO = +(process.env.AUTO || 0);
 const data = JSON.parse(fs.readFileSync(`${REF}/${key}.json`)).map(r => ({ t: r[0] - J2000, r: r.slice(1, 4), v: r.slice(4, 7) }));
 const wrap = x => Math.atan2(Math.sin(x), Math.cos(x));
 const norm = a => { const l = Math.hypot(...a); return a.map(x => x / l); };
@@ -149,12 +161,12 @@ function spectrum(v, P) {
   data.forEach((d, i) => { c += v[i] * Math.cos(w * d.t); s += v[i] * Math.sin(w * d.t); });
   return { A: 2 * Math.hypot(c, s) / v.length, c: 2 * c / v.length, s: 2 * s / v.length, P };
 }
-// The strongest period in PMIN … 30,000 days. Frequencies are scanned evenly, a quarter of the
+// The strongest period in PMIN … PMAX days. Frequencies are scanned evenly, a quarter of the
 // resolution 1/T of the data's span apart, so no peak falls between them (a grid even in period
 // would be too coarse at short periods); the sines are stepped by rotation, not recomputed.
 function peak(v) {
   const t0 = (data[0].t + data[data.length - 1].t) / 2, T = data[data.length - 1].t - data[0].t;
-  const f0 = 1 / 30000, df = 1 / (4 * T), K = Math.ceil((1 / PMIN - f0) / df);
+  const f0 = 1 / PMAX, df = 1 / (4 * T), K = Math.ceil((1 / PMIN - f0) / df);
   const C = new Float64Array(K), S = new Float64Array(K);
   data.forEach((d, i) => {
     const t = d.t - t0, x = v[i], cd = Math.cos(2 * Math.PI * df * t), sd = Math.sin(2 * Math.PI * df * t);

@@ -15,6 +15,7 @@ const LIMITS = {
   planetsFromEarthArcsec: 30, moonKm: 30,
   Io: 1000, Europa: 1000, Ganymede: 1000, Callisto: 1000, Titan: 1000, Triton: 150, Charon: 5, Phobos: 25, Deimos: 70,
   Mimas: 400, Enceladus: 150, Tethys: 350, Dione: 300, Rhea: 350, Iapetus: 2500,
+  Miranda: 150, Ariel: 200, Umbriel: 80, Titania: 200, Oberon: 120,
 };
 
 export function horizonsChecks(fixture) {
@@ -183,14 +184,18 @@ export function deltaTChecks() {
 // A sign or frame error would show up as tens of degrees.
 export function rotationChecks() {
   const ecc = { Io: 0.0041, Europa: 0.0094, Ganymede: 0.0013, Callisto: 0.0074, Titan: 0.0288, Triton: 0.0002, Charon: 0.0002, Phobos: 0.0151, Deimos: 0.0003,
-    Mimas: 0.0196, Enceladus: 0.0047, Tethys: 0.0001, Dione: 0.0022, Rhea: 0.0010, Iapetus: 0.0286 };
+    Mimas: 0.0196, Enceladus: 0.0047, Tethys: 0.0001, Dione: 0.0022, Rhea: 0.0010, Iapetus: 0.0286,
+    Miranda: 0.0013, Ariel: 0.0012, Umbriel: 0.0039, Titania: 0.0011, Oberon: 0.0014 };
   // Deimos: its IAU W carries 2.7° long-period terms, which the orbit fit follows to ~0.6°.
   // Charon: its IAU spin rate is 3e-6 °/day slower than the orbit fitted to PLU058, so the meridian
   // drifts 0.16° a century off the direction of Pluto (±0.3° over the 180 years sampled)
   const extra = { Phobos: 1.3, Ganymede: 0.2, Deimos: 0.7, Charon: 0.3,
     // Iapetus: its orbit is tilted 15° to its equator, and the Sun swings its longitude by ~1° at
     // periods near its orbit, which its slow rotation does not follow
-    Iapetus: 2.6 };
+    Iapetus: 2.6,
+    // Titania and Oberon: their eccentricities are sums of modes forced by each other (satellites.js),
+    // at times larger than the mean, and each moves the other along its orbit at 8.2 and 12.3 days
+    Titania: 0.2, Oberon: 0.15 };
   // Saturn's moons: the IAU puts their prime meridians at craters, from Voyager and Cassini control
   // networks, not at the mean sub-Saturn point; the maps use the same longitudes
   const offset = { Mimas: 8, Enceladus: 5, Iapetus: 7 };

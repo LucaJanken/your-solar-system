@@ -22,7 +22,8 @@ for (const b of BODIES) if (b.aKm) {
   INNERMOST[b.parent] = Math.min(INNERMOST[b.parent] || Infinity, b.aKm);
 }
 // how far out (scene units, beyond the planet's drawn radius) the outermost moon sits in the overview
-const MOON_BUDGET = { Earth: 2.9, Mars: 2.9, Jupiter: 10.6, Neptune: 3.5, Pluto: 2.2 };
+// (Uranus's: Miranda then sits 1.3 times as far out as the drawn rings' outer edge, 2 Uranus radii)
+const MOON_BUDGET = { Earth: 2.9, Mars: 2.9, Jupiter: 10.6, Uranus: 10, Neptune: 3.5, Pluto: 2.2 };
 // Saturn's moons run from Mimas, just outside the rings (3.1 Saturn radii), to Iapetus (59). The rings
 // are drawn in proportion to the planet, so with the power law used elsewhere Mimas would be drawn
 // inside them, or else the five inner moons would crowd into each other. Here the innermost sits a

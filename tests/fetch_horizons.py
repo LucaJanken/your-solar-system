@@ -2,7 +2,8 @@
 
     python3 tests/fetch_horizons.py            # everything
     python3 tests/fetch_horizons.py 606 401    # just Titan and Phobos
-    python3 tests/fetch_horizons.py --dense 601 602   # 12,000 random times, for fitting Saturn's moons
+    python3 tests/fetch_horizons.py --dense 601 602   # 12,000 random times, for fitting Saturn's and Uranus's moons
+    python3 tests/fetch_horizons.py --wide 701 702   # the same over 1600-2400, all Horizons has for Uranus's moons
     python3 tests/fetch_horizons.py --fixture  # rebuild the fixture entries of the bodies fetched
 
 Writes tests/horizons-full/<NAIF id>.json: rows of [JD(TDB), x, y, z, vx, vy, vz] in km and km/s,
@@ -10,6 +11,8 @@ ICRF (J2000 equatorial), geometric, every 37 days over 1800-2050. With --dense: 
 times over the same span (a fixed seed per body), into tests/horizons-dense/. Any regular grid
 aliases: on it a term of period P cannot be told from one of period 1 / (1/P + k/step), and a fit
 picks up the wrong one, right at the samples and wrong between them. Random times do not alias.
+With --wide: 12,000 random times over 1600-2400 into tests/horizons-wide/ (Uranus's moons, whose
+longitudes carry terms of centuries that 250 years cannot pin down).
 Planets are heliocentric, moons relative to their planet.
 tests/fixtures/horizons.json is every 10th row of the 37-day files (positions only); --fixture
 rewrites the entries of the bodies found in tests/horizons-full/ and keeps the others.
@@ -51,12 +54,13 @@ jobs = {k:(k,'500@10') for k in ['199','299','399','499','599','699','799','899'
 jobs.update({'301':('301','500@399'),'501':('501','500@599'),'502':('502','500@599'),'503':('503','500@599'),'504':('504','500@599'),
              '606':('606','500@699'),'401':('401','500@499'),'402':('402','500@499'),
              **{k:(k,'500@699') for k in ['601','602','603','604','605','608']},
+             **{k:(k,'500@799') for k in ['701','702','703','704','705']},
              '801':('801','500@899'),'901':('901','500@999')})
 HERE = os.path.dirname(os.path.abspath(__file__))
 NAMES = {'199':'Mercury','299':'Venus','399':'Earth','499':'Mars','599':'Jupiter','699':'Saturn','799':'Uranus','899':'Neptune',
          '999':'Pluto','301':'Moon','501':'Io','502':'Europa','503':'Ganymede','504':'Callisto','401':'Phobos','402':'Deimos',
          '601':'Mimas','602':'Enceladus','603':'Tethys','604':'Dione','605':'Rhea','606':'Titan','608':'Iapetus',
-         '801':'Triton','901':'Charon'}
+         '701':'Ariel','702':'Umbriel','703':'Titania','704':'Oberon','705':'Miranda','801':'Triton','901':'Charon'}
 CENTRES = {'10':'Sun','399':'Earth','499':'Mars','599':'Jupiter','699':'Saturn','799':'Uranus','899':'Neptune','999':'Pluto'}
 args = sys.argv[1:]
 if '--fixture' in args:
@@ -69,15 +73,16 @@ if '--fixture' in args:
         print('fixture', NAMES[k], len(rows))
     json.dump(fx, open(path, 'w'), separators=(',', ':'))
     raise SystemExit
-dense = '--dense' in args
-OUT = os.path.join(HERE, 'horizons-dense' if dense else 'horizons-full')
+dense, wide = '--dense' in args, '--wide' in args
+OUT = os.path.join(HERE, 'horizons-wide' if wide else 'horizons-dense' if dense else 'horizons-full')
 os.makedirs(OUT, exist_ok=True)
 which = [a for a in args if not a.startswith('--')] or list(jobs)
 for k in which:
     cmd, c = jobs[k]
-    if dense:
+    if dense or wide:
         rng = random.Random(int(k))
-        data = vectors_at(cmd, c, sorted(rng.uniform(2378498.5, 2470169.5) for _ in range(12000)))
+        lo, hi = (2305460.5, 2597620.5) if wide else (2378498.5, 2470169.5)   # 1600-01-14 .. 2399-12-11, 1800-01-03 .. 2050-12-31
+        data = vectors_at(cmd, c, sorted(rng.uniform(lo, hi) for _ in range(12000)))
     else:
         data = vectors(cmd, c, '1800-01-03', '2050-12-31', '37 d')
     json.dump(data, open(os.path.join(OUT, f'{k}.json'), 'w'))

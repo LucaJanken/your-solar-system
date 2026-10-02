@@ -9,7 +9,7 @@
 //   planets, Pluto      astronomy-engine: VSOP87 (truncated) and a numerically integrated Pluto
 //   Moon                astronomy-engine: Brown's theory (Improved Lunar Ephemeris, 1954), via Montenbruck & Pfleger
 //   Galilean moons      astronomy-engine: Lainey's L1.2 theory
-//   Saturn's moons, Triton, Charon, Phobos, Deimos  fits to JPL Horizons (see satellites.js)
+//   Saturn's and Uranus's moons, Triton, Charon, Phobos, Deimos  fits to JPL Horizons (see satellites.js)
 //   spin axes           IAU WGCCRE 2015: astronomy-engine RotationAxis for the Sun, Moon and planets,
 //                       NAIF pck00011 for the other moons (rotation.js); Earth: precession, nutation, GAST
 //   time scales         UT → TT via ΔT: USNO/IERS measurements and predictions 1657–2033 (deltat.js),
