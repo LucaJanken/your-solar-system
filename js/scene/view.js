@@ -55,13 +55,15 @@ export class View {
    * still moves by the usual 6%, but a fast spin of the wheel or a flick on a trackpad grows them up
    * to ZOOM_GAIN times, so the 10⁵ between a close look and the whole system is a few turns of the
    * wheel rather than a few hundred notches. A trackpad pinch (a wheel event marked ctrlKey without
-   * the Ctrl key down) follows the fingers at once, like a pinch on a touch screen.
+   * the Ctrl key down) follows the fingers at once, like a pinch on a touch screen (and, as there,
+   * a flick carries on after release: see _touchPan).
    */
   _wheel() {
     const ZOOM_EASE = 90, ZOOM_HEAT = 350, ZOOM_GAIN = 8;
     const step = this.zoomSpeed * Math.log(1 / 0.95);   // per notch, as OrbitControls
     let heat = 0, heatT = 0, heatDir = 0, ctrlHeld = false;
     this.zoomLeft = 0;
+    this._ease = ZOOM_EASE;   // time constant of the zoom still to be made; a pinch's release lengthens it
     // a pinch arrives with ctrlKey set but no Ctrl key down (as OrbitControls tells them apart)
     for (const ev of ['keydown', 'keyup']) window.addEventListener(ev, e => { if (e.key === 'Control') ctrlHeld = ev === 'keydown'; });
     window.addEventListener('blur', () => { ctrlHeld = false; });
@@ -75,6 +77,7 @@ export class View {
       const now = performance.now(), dir = Math.sign(n);
       // the page may have been resting (no update() calls): the easing starts from this event
       if (!this.zoomLeft) this._last = now;
+      this._ease = ZOOM_EASE;
       heat = dir === heatDir ? heat * Math.exp(-(now - heatT) / ZOOM_HEAT) : 0;
       heatT = now; heatDir = dir;
       this.zoomLeft += n * step * Math.min(ZOOM_GAIN, 1 + 0.15 * heat * heat);
@@ -82,7 +85,7 @@ export class View {
     }, { passive: false });
     this._zoomStep = dt => {
       if (!this.zoomLeft) return;
-      const k = Math.abs(this.zoomLeft) < 1e-4 ? 1 : 1 - Math.exp(-dt / ZOOM_EASE);
+      const k = Math.abs(this.zoomLeft) < 1e-4 ? 1 : 1 - Math.exp(-dt / this._ease);
       this.zoomBy(this.zoomLeft * k);
       this.zoomLeft -= this.zoomLeft * k;
     };
@@ -112,11 +115,18 @@ export class View {
    * looks exactly like a pinch with one finger still. Across their line the same head start barely
    * changes the separation, which is why only that direction used to work.
    *
+   * Released while still moving, a pinch coasts on: the zoom rate of the last frames (smoothed, so
+   * one jittery frame neither starts nor stops it) is handed to the wheel's easing (`zoomLeft`) with
+   * a longer time constant PINCH_COAST, which makes the zoom continue at exactly that rate and
+   * decay from it, so a flick-pinch crosses the large range between a close look and the whole
+   * system without lagging behind the fingers while they are down. A touch cancels it.
+   *
    * The fingers are judged together, once per frame (in update), not per pointer event: each
    * finger's move arrives as its own event, and in between only the first finger has moved.
    */
   _touchPan() {
     const touches = new Map();
+    const PINCH_COAST = 260, PINCH_STALE = 80, PINCH_MIN = 2e-4, COAST_MAX = 6;   // ms, ms, ln per ms, ln
     let g = null;
     const measure = () => {
       const [a, b] = touches.values();
@@ -127,6 +137,7 @@ export class View {
     };
     this.dom.addEventListener('pointerdown', e => {
       if (e.pointerType !== 'touch') return;
+      this.zoomLeft = 0;
       touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
       regroup();
     });
@@ -134,10 +145,19 @@ export class View {
       const p = touches.get(e.pointerId);
       if (p) { p.x = e.clientX; p.y = e.clientY; }
     }, { passive: true });
-    const lift = e => { if (touches.delete(e.pointerId)) regroup(); };
+    const lift = e => {
+      if (!touches.has(e.pointerId)) return;
+      // coast on if the pinch was moving when the finger left (and the lift is not a cancel)
+      if (g && g.mode === 'pinch' && e.type === 'pointerup' && Math.abs(g.rate) > PINCH_MIN && performance.now() - g.rateAt < PINCH_STALE) {
+        this._ease = PINCH_COAST;
+        this.zoomLeft = Math.max(-COAST_MAX, Math.min(COAST_MAX, g.rate * PINCH_COAST));
+      }
+      touches.delete(e.pointerId);
+      regroup();
+    };
     window.addEventListener('pointerup', lift, { passive: true });
     window.addEventListener('pointercancel', lift, { passive: true });
-    this._touchStep = () => {
+    this._touchStep = dt => {
       if (!g) return;
       const m = measure();
       if (!g.mode) {
@@ -147,15 +167,20 @@ export class View {
         if (moved >= 10 && moved > 1.5 * stretched) g.mode = 'pan';
         else if (stretched >= (opposed ? 8 : 20) && (opposed || stretched >= 1.5 * moved)) g.mode = 'pinch';
         else return;
-        g.last = g.start;
+        g.last = g.start; g.rate = 0; g.rateAt = performance.now();
         this._yield();
       }
       if (g.mode === 'pan') this.panBy(m.x - g.last.x, m.y - g.last.y);
       else {
         // as OrbitControls zooms on a pinch; its update then keeps the distance within its limits
         const c = this.camera, t = this.controls.target;
-        _o.subVectors(c.position, t).multiplyScalar(Math.pow(g.last.sep / Math.max(m.sep, 1), this.zoomSpeed));
+        const x = this.zoomSpeed * Math.log(g.last.sep / Math.max(m.sep, 1));
+        _o.subVectors(c.position, t).multiplyScalar(Math.exp(x));
         c.position.copy(t).add(_o);
+        // smoothed over about two frames; a frame with no news (rate stands still) fades it
+        const w = Math.min(1, dt / 32);
+        g.rate += (x / Math.max(dt, 1) - g.rate) * w;
+        if (x) g.rateAt = performance.now();
       }
       g.last = m;
     };
@@ -258,7 +283,7 @@ export class View {
   update(disp, focusRadius, maxDist) {
     const now = performance.now(), dt = Math.min(100, now - (this._last || now));   // ms
     this._last = now;
-    this._touchStep();
+    this._touchStep(dt);
     const o = disp[this.focus];
     const d = [o[0] - this.origin[0], o[1] - this.origin[1], o[2] - this.origin[2]];
     this.origin = o.slice();

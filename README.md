@@ -99,7 +99,8 @@ GitHub Pages serves the repository as-is.
   drifting catches up with it. Spin axis shows its rotation axis.
 - Dragging (one finger) turns the view around the focus; scroll or pinch zooms. The wheel eases each
   step in, and its steps grow (up to 8×) the faster it is turned, so a quick spin crosses from a
-  close look to the whole system. Moving the view sideways (right- or shift-drag, arrow keys,
+  close look to the whole system; a pinch released while still moving coasts on the same way.
+  Moving the view sideways (right- or shift-drag, arrow keys,
   two-finger drag) also works locked: the camera keeps following the body from there. A two-finger
   gesture either pinches or drags, never both. A planet's arrow, right beside its name, opens its
   moons in the list, and they stay listed until the arrow closes them; the moons that selecting a
