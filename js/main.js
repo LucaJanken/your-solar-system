@@ -414,10 +414,10 @@ function frame(now) {
   const sp = screenPos.find(p => p.name === state.selected);
   bodies.axis.visible = state.show.axis && bodies.views[state.selected].group.visible && !!sp && sp.rpx > 5;
 
+  bodies.setMonth(new Date(state.simMs).getUTCMonth() + 1);   // Earth's seasonal maps
   bodies.loadVisible(camera, H);
-  // swap in the high-resolution Earth when it fills the screen
-  const se = screenPos.find(s => s.name === 'Earth');
-  if (se && se.onScreen && se.rpx > 350) bodies.upgrade('Earth');
+  // swap in a body's high-resolution map (tex.hires) once it fills the screen
+  for (const s of screenPos) if (s.onScreen && s.rpx > 350) bodies.upgrade(s.name);
 
   const sunV = bodies.views.Sun;
   if (state.show.glare) glare.update(camera, sunV.group.position, sunV.R, W, H, renderer.getPixelRatio(),

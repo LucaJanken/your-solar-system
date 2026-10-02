@@ -25,7 +25,7 @@ export const BODIES = [
     name: 'Mercury', type: 'Terrestrial planet', parent: 'Sun', color: '#9a8f86', photometry: 'lunar',
     shape: [2440.53, 2440.53, 2438.26], massKg: 3.3011e23,
     periodD: 87.969, rotationH: 1407.6, solarDayH: 4222.6, obliquity: 0.034,
-    tex: { map: 'mercury.jpg' },
+    tex: { map: 'mercury.jpg', hires: 'mercury_4k.jpg', tint: '#ffefdf' },
     desc: 'The smallest planet, and the closest to the Sun. It spins exactly three times for every two orbits, so one solar day there lasts two Mercury years.',
   },
   {
@@ -41,7 +41,8 @@ export const BODIES = [
     name: 'Earth', type: 'Terrestrial planet', parent: 'Sun', color: '#5f8fd0',
     shape: [6378.137, 6378.137, 6356.752], massKg: 5.9722e24,
     periodD: 365.256, rotationH: 23.9345, solarDayH: 24.0, obliquity: 23.44,
-    tex: { map: 'earth.jpg', hires: 'earth_4k.jpg', night: 'earth_night.jpg', clouds: 'earth_clouds.jpg', rough: 'earth_rough.jpg' },
+    // {MM}: one map per month (snow, vegetation and sea ice follow the seasons)
+    tex: { map: 'earth_{MM}.jpg', hires: 'earth_{MM}_4k.jpg', night: 'earth_night.jpg', clouds: 'earth_clouds.jpg', rough: 'earth_rough_{MM}.jpg' },
     representative: 'the clouds are a snapshot, not the weather on this date',
     // tauZenith: vertical optical depth for the sRGB channels (610, 550, 465 nm): Rayleigh scattering
     // (Hansen & Travis 1974) plus a typical clear-sky aerosol load, τ(550 nm) = 0.1 with Ångström
@@ -53,14 +54,14 @@ export const BODIES = [
     name: 'Moon', type: 'Moon of Earth', parent: 'Earth', color: '#bfbcb6', photometry: 'lunar',
     shape: [1737.4, 1737.4, 1737.4], massKg: 7.346e22,
     periodD: 27.3217, aKm: 384400, synodicD: 29.5306, obliquity: 6.68, synchronous: true,
-    tex: { map: 'moon.jpg' },
+    tex: { map: 'moon.jpg', hires: 'moon_4k.jpg' },
     desc: 'Tidally locked, it always shows Earth the same face. It probably formed from debris thrown out when a Mars-sized body hit the young Earth, and it drifts 3.8 cm farther away every year.',
   },
   {
     name: 'Mars', type: 'Terrestrial planet', parent: 'Sun', color: '#c1502a',
     shape: [3396.19, 3396.19, 3376.20], massKg: 6.4171e23,
     periodD: 686.980, rotationH: 24.6229, solarDayH: 24.6597, obliquity: 25.19,
-    tex: { map: 'mars.jpg' },
+    tex: { map: 'mars.jpg', hires: 'mars_4k.jpg' },
     desc: 'A cold desert with the tallest volcano in the Solar System, Olympus Mons (about 22 km high), and Valles Marineris, a canyon system as long as the United States is wide.',
   },
   {
@@ -72,7 +73,7 @@ export const BODIES = [
   {
     name: 'Deimos', type: 'Moon of Mars', parent: 'Mars', color: '#a39486', photometry: 'lunar',
     shape: [7.8, 6.0, 5.1], massKg: 1.4762e15, periodD: 1.26244, aKm: 23463, synchronous: true,
-    tex: { tint: '#8f857c' },
+    tex: { map: 'deimos.jpg', tint: '#ffeede' },
     desc: 'A 12 km lump of dark rock. Whether Mars’s two moons are captured asteroids or debris from a giant impact is still debated; JAXA’s MMX mission is going there to find out.',
   },
   {
@@ -111,7 +112,7 @@ export const BODIES = [
     shape: [60268, 60268, 54364], massKg: 5.6834e26,
     periodD: 10759.22, rotationH: 10.561, solarDayH: 10.562, obliquity: 26.73,
     rotationNote: 'from ring seismology',
-    tex: { map: 'saturn.jpg' },
+    tex: { map: 'saturn.jpg' }, representative: 'the cloud bands as Hubble saw them in August 2025; they drift and change with the seasons',
     rings: {
       tex: 'saturn_rings.png', innerKm: 70426, outerKm: 141127,
       // The map's opacity is artistic; it is rescaled region by region to these mean normal optical
@@ -202,7 +203,7 @@ export const BODIES = [
     desc: 'The outermost of Uranus’s large moons, and the second largest. Its old surface is crowded with craters, some floored with dark material, and a mountain about 11 km high stood out on its edge in Voyager’s images.',
   },
   {
-    name: 'Neptune', type: 'Ice giant', parent: 'Sun', color: '#4a6fd0',
+    name: 'Neptune', type: 'Ice giant', parent: 'Sun', color: '#8dc6de',
     shape: [24764, 24764, 24341], massKg: 1.02413e26,
     periodD: 60182, rotationH: 16.11, solarDayH: 16.11, obliquity: 28.32,
     tex: { map: 'neptune.jpg' },

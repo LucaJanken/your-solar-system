@@ -6,6 +6,9 @@ import { makeShadowUniforms, patchBodyMaterial, sunMaterial, ringMaterial, atmos
 
 const TEX_DIR = 'textures/';
 const C_KMS = 299792.458;
+// a map file name with {MM} comes in twelve monthly versions (Earth's seasons), chosen by the date
+const isMonthly = f => typeof f === 'string' && f.includes('{MM}');
+const MONTH_SWITCH_MS = 1000;   // while time runs fast, swap the monthly maps at most this often
 
 const _m = new THREE.Matrix4(), _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3();
 
@@ -76,6 +79,8 @@ export class BodyViews {
     this.aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     this.shared = shared;   // { nightOn: {value}, bright: {value} }
     this.onChange = () => {};   // called when something finishes loading
+    this.month = 0;             // of the simulated date, 1–12 (setMonth), for the monthly maps
+    this.monthSwitched = -Infinity;
     this.views = {};
     for (const def of BODIES) this.views[def.name] = this.create(def);
     this.axis = spinAxis();
@@ -87,7 +92,7 @@ export class BodyViews {
   setAxis(name) { this.axisOf = name; }
 
   tex(file, color = true, onLoad) {
-    const t = this.loader.load(TEX_DIR + file, onLoad);
+    const t = this.loader.load(TEX_DIR + file.replace('{MM}', String(this.month || 1).padStart(2, '0')), onLoad);
     t.anisotropy = this.aniso;
     t.wrapS = THREE.RepeatWrapping;   // longitude wraps (the rotation blur samples across the seam)
     if (color) t.colorSpace = THREE.SRGBColorSpace;
@@ -98,7 +103,8 @@ export class BodyViews {
     const group = new THREE.Group(), orient = new THREE.Group();
     group.add(orient);
     this.scene.add(group);
-    const v = { def, group, orient, Rmean: meanRadius(def), k: 1, u: null, rings: null };
+    const v = { def, group, orient, Rmean: meanRadius(def), k: 1, u: null, rings: null,
+      monthly: Object.values(def.tex || {}).some(isMonthly), mapGen: 0, roughGen: 0 };
     const seg = def.name === 'Sun' || def.parent === 'Sun' ? [96, 64] : [64, 40];
 
     if (def.name === 'Sun') {
@@ -171,19 +177,38 @@ export class BodyViews {
 
   loadMaps(v) {
     v.pending = false;
-    const t = v.def.tex, mat = v.mesh.material;
-    if (t.map) this.tex(t.map, true, tx => {
-      if (v.upgraded) return tx.dispose();
-      mat.map = tx; mat.color.set(t.tint || 0xffffff); mat.needsUpdate = true;
-    });
-    // The map gives the sea 0.33, far glossier than real wind-roughened water. Cox & Munk (1954):
-    // mean-square wave slope 0.003 + 0.00512·W, ≈ 0.04 at a typical 7 m/s wind, i.e. a GGX width
-    // α ≈ 0.28, which is roughness √α ≈ 0.53 in three.js; scaling the map by 1.6 gives that (land
-    // saturates at 1).
-    if (t.rough) this.tex(t.rough, false, tx => { mat.roughnessMap = tx; mat.roughness = 1.6; mat.needsUpdate = true; });
+    const t = v.def.tex;
+    if (t.map) this.setMap(v, v.upgraded ? t.hires : t.map);
+    if (t.rough) this.setRough(v);
     if (t.night) this.tex(t.night, true, tx => { v.nightU.value = tx; });
     if (t.clouds) this.tex(t.clouds, false, tx => {
       v.clouds.material.alphaMap = tx; v.clouds.material.needsUpdate = true; v.clouds.visible = true;
+    });
+  }
+
+  // The colour map. A month change or the high-resolution swap can overtake a load still in
+  // flight, so only the newest request is kept.
+  setMap(v, file) {
+    const gen = ++v.mapGen, mat = v.mesh.material;
+    this.tex(file, true, tx => {
+      if (gen !== v.mapGen) return tx.dispose();
+      const old = mat.map;
+      mat.map = tx; mat.color.set(v.def.tex.tint || 0xffffff); mat.needsUpdate = true;
+      if (old) old.dispose();
+    });
+  }
+
+  // The map gives the sea 0.33, far glossier than real wind-roughened water. Cox & Munk (1954):
+  // mean-square wave slope 0.003 + 0.00512·W, ≈ 0.04 at a typical 7 m/s wind, i.e. a GGX width
+  // α ≈ 0.28, which is roughness √α ≈ 0.53 in three.js; scaling the map by 1.6 gives that (land
+  // and sea ice saturate at 1).
+  setRough(v) {
+    const gen = ++v.roughGen, mat = v.mesh.material;
+    this.tex(v.def.tex.rough, false, tx => {
+      if (gen !== v.roughGen) return tx.dispose();
+      const old = mat.roughnessMap;
+      mat.roughnessMap = tx; mat.roughness = 1.6; mat.needsUpdate = true;
+      if (old) old.dispose();
     });
   }
 
@@ -192,10 +217,25 @@ export class BodyViews {
     const v = this.views[name];
     if (v.upgraded || !v.def.tex || !v.def.tex.hires) return;
     v.upgraded = true;
-    this.loader.load(TEX_DIR + v.def.tex.hires, t => {
-      t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = this.aniso; t.wrapS = THREE.RepeatWrapping;
-      const old = v.mesh.material.map; v.mesh.material.map = t; v.mesh.material.color.set(v.def.tex.tint || 0xffffff); v.mesh.material.needsUpdate = true; old && old.dispose();
-    });
+    if (!v.pending) this.setMap(v, v.def.tex.hires);
+  }
+
+  /** the month (1–12) of the simulated date: swaps the maps that come in monthly versions */
+  setMonth(m, now = performance.now()) {
+    if (m === this.month) return;
+    // at high speed the month changes every few frames: follow it at most once a second
+    // instead of reloading the maps continuously
+    if (now - this.monthSwitched < MONTH_SWITCH_MS) return;
+    const first = !this.month;
+    this.month = m; this.monthSwitched = now;
+    if (first) return;   // nothing loaded yet: the maps load for this month when they do
+    for (const v of Object.values(this.views)) {
+      if (v.pending || !v.monthly) continue;
+      const t = v.def.tex;
+      const map = v.upgraded ? t.hires : t.map;
+      if (isMonthly(map)) this.setMap(v, map);
+      if (isMonthly(t.rough)) this.setRough(v);
+    }
   }
 
   /**

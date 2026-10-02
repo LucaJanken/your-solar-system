@@ -128,7 +128,8 @@ js/ui/          info.js: information panel; hud.js: hiding the interface, tellin
 js/main.js      state, main loop, controls
 vendor/         three.js r186 (+ OrbitControls) and astronomy-engine 2.1.19, minified ES modules
 data/stars.bin  9,096 BSC5 stars: RA, Dec, V, B−V, proper motion (int16 each)
-textures/       maps, 2048 × 1024 unless noted; milky_way.jpg is 4096 × 2048, equirectangular in J2000 RA/Dec
+textures/       maps, 2048 × 1024 unless noted; *_4k.jpg are 4096 × 2048, loaded once the body fills
+                the screen; earth_MM*.jpg one per month; milky_way.jpg is 4096 × 2048, in J2000 RA/Dec
 tests/          accuracy checks against JPL Horizons and NASA's eclipse canon
 ```
 
@@ -171,11 +172,18 @@ npx esbuild node_modules/astronomy-engine/esm/astronomy.js --format=esm --minify
 
 Astronomy Engine (Don Cross, MIT) · three.js (MIT) · JPL Horizons · NASA NAIF · USNO/IERS ·
 Yale Bright Star Catalogue (CDS) · Milky Way from NASA/GSFC Scientific Visualization Studio, Deep Star
-Maps 2020 (Hipparcos-2, Tycho-2, Gaia DR2: ESA/Gaia/DPAC) · planet maps from Solar System Scope
-(CC BY 4.0) · moon maps from USGS Astrogeology / NASA / JPL (Europa from the 500 m Voyager–Galileo
+Maps 2020 (Hipparcos-2, Tycho-2, Gaia DR2: ESA/Gaia/DPAC) · Venus, Jupiter, Uranus, Neptune (recoloured,
+see below), Saturn's rings and Earth's clouds and night lights from Solar System Scope (CC BY 4.0) ·
+Earth from NASA's Blue Marble Next Generation (Reto Stöckli, NASA Earth Observatory) with sea ice from
+the NSIDC Sea Ice Index (G02135, version 4) · the Moon from NASA's Scientific Visualization Studio CGI
+Moon Kit (LRO/LROC, Ernie Wright) · Mars from the USGS Viking MDIM 2.1 colour mosaic · Mercury from the
+MESSENGER MDIS low-incidence basemap (NASA/JHUAPL/Carnegie, USGS) · Saturn from Hubble's OPAL program
+(PI: Simon, GO13937, doi:10.17909/T9G593; NASA/ESA/STScI) · moon maps from USGS Astrogeology / NASA / JPL
+(Callisto from the 1 km Voyager–Galileo mosaic, Europa from the 500 m Voyager–Galileo
 mosaic; Charon's New Horizons and Triton's Voyager 2 global mosaics; Uranus's moons from the Voyager 2
 mosaics by Tammy Becker, USGS, with JPL) and Pluto from NASA / JHUAPL /
-SwRI (public domain) · Saturn's moons from the Cassini global colour maps (NASA/JPL-Caltech/Space
+SwRI (public domain) · Deimos from Philip Stooke's Viking, Mariner 9 and HiRISE mosaic (with Chris
+Jongkind and Megan Arntz; PDS Small Bodies Node) · Saturn's moons from the Cassini global colour maps (NASA/JPL-Caltech/Space
 Science Institute/Lunar and Planetary Institute) · EB Garamond (Georg Duffner) and IBM Plex Mono (OFL).
 
 The Milky Way map was made from `milkyway_2020_4k.exr` (svs.gsfc.nasa.gov/4851) at its full
@@ -204,9 +212,74 @@ maps show infrared, green and ultraviolet as red, green and blue, so only their 
 reddish brown of its dark side is real. USGS's own global mosaics of these moons were not used: they
 are normalised to remove brightness differences, which erases the two faces of Iapetus.
 
+The maps below were rebuilt in October 2026. The maps are not albedo-calibrated against each other,
+so Mars, Mercury, Saturn and Callisto keep the mean brightness of the maps they replaced; Earth is
+physical reflectance, the Moon is as published, and Neptune is set relative to Uranus.
+
+Earth has one map per month (`earth_MM.jpg`, `earth_MM_4k.jpg`, chosen by the date's month, so
+snow and vegetation follow the seasons), made from the 2004 Blue Marble Next Generation monthly
+composites (5400 × 2700). Those are surface reflectances with the open ocean filled near black; the
+ocean was given the water-leaving reflectance of clear water, π·Rrs = (0.0016, 0.0047, 0.022)
+(Morel & Maritorena 2001), keeping Blue Marble's brighter shallow and turbid water. Sea ice comes from
+the NSIDC Sea Ice Index monthly concentrations for the same year (25 km polar grids, reprojected,
+filled up to 50 km into coast cells), at the albedo of snow-covered multiyear ice through the Arctic
+year (0.85, falling to 0.50 in August: Perovich et al. 2002) and of Antarctic pack ice (0.80: Brandt
+et al. 2005). The atmosphere shader adds only the air beyond one air mass, so one air mass was put
+into the map: ρ = ρ_surface · exp(−τR − 0.33 τa) + single-scattered path light for an overhead Sun
+and nadir view (0.375 τR, plus the aerosol backscatter of τa(550) = 0.1, g = 0.7), with Rayleigh τR
+from Hansen & Travis (1974) at 610, 550 and 465 nm. Sea ice also counts as rough in the monthly
+`earth_rough_MM.jpg`, so it shows no sun glint.
+
+The Moon is NASA SVS's CGI Moon Kit colour map (svs.gsfc.nasa.gov/4720, LROC WAC, photometrically
+normalised so it carries no shading), box-averaged from 8192 × 4096 in linear light.
+
+Mars takes its brightness from the USGS Viking MDIM 2.1 colour mosaic (1 km JPEG) but not its colour,
+which makes the dark regions blue-grey and fills Hellas with frost. Its red channel, the band where
+Mars's albedo features are strongest, is scaled to Hubble's 1999 true-colour image of Mars (WFPC2,
+STScI 1999-02), and the colour then follows from brightness through linear fits made on that image's
+central disc (r < 0.6 R): R = −0.059 + 2.09 Y, G = 0.014 + 0.77 Y, B = 0.037 + 0.048 Y, which turns
+dark basalt brown and bright dust ochre. Bright, blue-white ice keeps Viking's colour poleward of 60°.
+
+Mercury is the MESSENGER MDIS low-incidence basemap (166 m), which shows albedo rather than relief,
+box-averaged 15 × 15 and then to 4096 and 2048 wide. Toward the poles the Sun is always low and the
+mosaic turns into relief shading (shadows, and sunlit slopes clipped to white), so its deviations from
+a smooth local mean (4° boxes of constant size on the ground) are tapered from full at 70° to 35% at
+84° and none from 86°, the last few degrees taking the mean of the 80–84° band. It is grey, tinted in
+`bodies.js` with Mercury's geometric albedos at the three channels (Mallama et al. 2017: 0.165,
+0.142, 0.122).
+
+Saturn is the Hubble OPAL map of 29 August 2025 (Cycle 32, rotation a; 5 px per degree), when the
+rings were edge-on and both hemispheres in view. Red is the F631N map, green F502N interpolated to
+550 nm toward F631N, blue F467M, each converted to I/F with the OPAL scale factors. Toward the poles,
+seen at the limb, each filter's Minnaert correction diverges (502 nm drops below 467 nm, which
+Saturn's spectrum does not allow), so the colour ratios are taken within 50° of the equator and held
+at their 55° value beyond; the brightness comes from F631N everywhere. Specks from moons and their
+shadows were removed, the band the rings hid (0.2°–4.4°N) and the caps beyond 79°N and 84°S filled,
+the planetographic latitudes resampled to the parametric latitude a stretched sphere uses, and the
+mean colour set to Saturn's geometric albedos at the channels (0.61, 0.50, 0.40; Mallama et al. 2017).
+
+Callisto was rebuilt from the USGS 1 km Voyager–Galileo mosaic, box-averaged in linear light with its
+data values taken as linear (the previous map was strongly stretched), and its gaps filled by
+interpolating the surrounding surface, fading to the mean surface over 10°. The patchwork that
+remains is the mosaic's mix of image resolutions, not brightness steps.
+
+Deimos is Philip Stooke's global mosaic (7200 × 3600, planetocentric, controlled to Peter Thomas's
+shape model, with HiRISE detail added in 2009). It is drawn on the triaxial ellipsoid in `bodies.js`,
+a stretched sphere, so each pixel was resampled from the direction of the stretched point, not the
+sphere's; it is set to Phobos's map brightness (geometric albedos 0.068 and 0.071) and tinted with
+Deimos's former catalogue colour. The far side was imaged at lower resolution and looks smoother.
+
+Neptune is the Solar System Scope map recoloured. Voyager 2's familiar deep-blue Neptune was
+contrast-stretched; reprocessed, it is a pale greenish blue close to Uranus (Irwin et al. 2024, MNRAS
+527, 11521). The colour is Uranus's map colour times the Neptune/Uranus ratio measured on their
+reprocessed discs (0.63, 0.74, 0.88 for R, G, B), at 0.91 of Uranus's brightness (V geometric albedos
+0.442 and 0.488, Mallama et al. 2017); the map's own brightness variations are kept at the power
+0.6, and its white clouds stay white.
+
 ## License
 
 The code is released under the [MIT License](LICENSE). The vendored libraries, fonts, maps and data
 keep their own licences, listed under Credits above: three.js and Astronomy Engine (MIT), EB Garamond
-and IBM Plex Mono (SIL Open Font License), the Solar System Scope planet maps (CC BY 4.0, which requires crediting
-them) and the public-domain NASA / USGS / JPL maps and data.
+and IBM Plex Mono (SIL Open Font License), the Solar System Scope maps (CC BY 4.0, which requires crediting
+them and noting changes: Neptune's is recoloured), the NSIDC sea-ice data (free to use, with citation) and
+the public-domain NASA / USGS / JPL / STScI maps and data.
