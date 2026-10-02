@@ -2,9 +2,8 @@
 // brighter. Drawn in screen space over the finished picture, and sized in pixels relative to the
 // Sun's drawn disc:
 //   bloom   a rim of light hugging the limb, a few percent of the disc radius wide, at every size;
-//   halo    a soft glow and a wide faint veil while the disc is small on screen. It fades out as the
-//           disc grows, so a close or telescope view (the Sun seen through a filter) keeps its limb
-//           darkening and the planets crossing it;
+//   halo    a soft glow and a wide faint veil, at every size of the disc (it is drawn only over empty
+//           sky, so a close view keeps its limb darkening and the planets crossing it);
 //   corona  fine radial streaks through the halo, like the "ciliary corona" of an eye, whose light
 //           is scattered by fibres and particles in the lens and so changes with every movement of
 //           the eye: each streak brightens and fades as the view turns, and slowly also while it is
@@ -110,7 +109,7 @@ export class SunGlare {
     if (!this.on) { this.vis = 0; return; }
     this.vis = visibleFraction(camera, sunPos, R, occluders) * edge;
     this.on = this.vis > 0.001;
-    this.halo = Math.max(0, Math.min(1, (90 - rpx) / 60));
+    this.halo = 1;   // full at every size: the glare lights only sky, so a big disc keeps its limb darkening
     this.dir.copy(sunPos).sub(camera.position).normalize();
     const u = this.uniforms;
     u.uSun.value.set(x * pixelRatio, y * pixelRatio);
