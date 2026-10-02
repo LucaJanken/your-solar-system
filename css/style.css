@@ -152,7 +152,7 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
 
 /* ---- info (bottom left) ---- */
 /* never closer to the panels above it (--info-top, measured in main.js) than to the bottom edge */
-.info { left: var(--gl); bottom: var(--gb); width: 440px; max-height: calc(100% - var(--info-top, 180px) - var(--gap) - var(--gb)); overflow-y: auto; padding: 14px 15px; }
+.info { left: var(--gl); bottom: var(--gb); width: 450px; max-height: calc(100% - var(--info-top, 180px) - var(--gap) - var(--gb)); overflow-y: auto; padding: 14px 15px; }
 .info-head { display: flex; align-items: center; gap: 10px; }
 .info-type { margin-left: auto; }
 /* the fold button: a 25 px square, 10 px from the panel's top, right and bottom edges. Its + and –
@@ -171,20 +171,26 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
 .info-min:hover { border-color: var(--line-strong); }
 /* folded down to the heading; tapping anywhere on it opens it again */
 .info.min { cursor: pointer; }
+/* as tall as the time controls beside it (--ctl-h, measured in main.js), its heading centred, so the
+   two bottom panels end level whatever size the buttons have */
+.info.min { display: flex; flex-direction: column; justify-content: center; min-height: var(--ctl-h, 56px); padding-top: 0; padding-bottom: 0; }
 .info.min .info-body { display: none; }
 .info-name { font: 500 25px/1 var(--serif); letter-spacing: 0.01em; }
 .info-type { font: 500 12px/1 var(--serif); letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent-text); }
 .info-desc { margin: 9px 0 0; font: 400 16px/1.4 var(--serif); color: var(--text-2); text-wrap: pretty; }
-.facts { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line); display: grid; grid-template-columns: minmax(84px, min(34%, 150px)) 1fr; gap: 5px 14px; font: 400 11px/1.35 var(--mono); }
+/* the figures most read on the page: 12 px on computers, 11 px on phones (whose second column has
+   just room for "1.0009 AU (149.7 million km)") */
+.facts { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line); display: grid; grid-template-columns: minmax(84px, min(34%, 150px)) 1fr; gap: 5px 14px; font: 400 12px/1.35 var(--mono); }
 .facts dt { color: var(--text-3); } .facts sup { font-size: 0.72em; line-height: 0; } .facts dd { margin: 0; color: rgb(var(--ink-rgb) / 0.92); font-variant-numeric: tabular-nums; }
-.info details { margin-top: 10px; font: 400 11px/1.35 var(--mono); }
+.info details { margin-top: 10px; font: 400 12px/1.35 var(--mono); }
 .info summary { cursor: pointer; color: var(--text-3); font: 500 12px/1.35 var(--serif); letter-spacing: 0.12em; text-transform: uppercase; }
 .info .note { margin-top: 8px; font: 400 13.5px/1.4 var(--serif); color: var(--text-3); }
 
 /* ---- time controls (bottom right) ---- */
 /* one row: play, reverse, the speed slider under its caption, the calendar, eclipses & transits, Now
-   (on phones the slider takes a row of its own) */
-.timectl { right: var(--gr); bottom: var(--gb); width: 460px; padding: 10px 12px; display: grid; grid-template-columns: auto auto 1fr auto auto auto; grid-template-areas: "play rev speed when events now"; align-items: center; gap: 8px; }
+   (on phones the slider takes a row of its own); as wide as the information panel, so the two bottom
+   corners match */
+.timectl { right: var(--gr); bottom: var(--gb); width: 450px; padding: 10px 12px; display: grid; grid-template-columns: auto auto 1fr auto auto auto; grid-template-areas: "play rev speed when events now"; align-items: center; gap: 8px; }
 #playBtn { grid-area: play; } #revBtn { grid-area: rev; } .speed-box { grid-area: speed; }
 .when { grid-area: when; } #eventsBtn { grid-area: events; } #nowBtn { grid-area: now; }
 .btn.icon svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.3; }
@@ -307,9 +313,64 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
 #hudHint { position: absolute; left: 50%; bottom: calc(var(--gb) + 8px); transform: translateX(-50%); width: max-content; padding: 8px 12px; background: rgb(var(--panel-rgb) / 0.8); border: 1px solid var(--line); font: 400 14px/1.3 var(--serif); color: var(--text-2); opacity: 0; transition: opacity 0.6s; pointer-events: none; max-width: calc(100% - 32px); text-align: center; }
 #hudHint.on { opacity: 1; transition-duration: 0.2s; }
 
+/* ---- large screens (a 27" monitor, a TV): the same layout, a size up, so it is not lost in the
+   corners. Below the touchscreen rules, which win where both apply. ---- */
+@media (min-width: 1680px) and (min-height: 1000px) {
+  :root { --gap: 24px; }
+  .kicker, .panel h2 { font-size: 13px; }
+  .clock { font-size: 44px; }
+  .date { font-size: 20px; }
+  .chip { height: 24px; font-size: 13px; }
+  #tzLabel { font-size: 11px; }
+  .out { height: 32px; font-size: 14px; }
+  .time-details { font-size: 12px; max-width: 350px; }
+  .right { --bar-h: 52px; }
+  .bodies { width: 200px; }
+  .tab-ic { width: 17px; height: 17px; }
+  .tab-tx { font-size: 11px; }
+  .body-btn { padding: 8px 8px 8px 13px; font-size: 14px; }
+  .body-item.moon .body-btn { padding-left: 30px; font-size: 13px; }
+  .check { padding: 8px 13px; font-size: 13px; }
+  .settings h2 { padding: 0 13px 7px; }
+  .settings input[type=range] { width: calc(100% - 26px); margin: 0 13px; }
+  .slider-ends { padding: 0 13px; }
+  .slider-ends button { font-size: 13px; }
+  .info, .timectl { width: 490px; }
+  .info { padding: 16px 17px; }
+  .info-name { font-size: 27px; }
+  .info-type { font-size: 13px; }
+  .info-desc { font-size: 17px; }
+  .facts, .info details { font-size: 12.5px; }
+  .info summary { font-size: 13px; }
+  .info .note { font-size: 14.5px; }
+  .timectl { padding: 11px 13px; gap: 9px; }
+  .round { width: 36px; height: 36px; }
+  .round svg { width: 17px; height: 17px; }
+  .speed-cap .kicker, .rate { font-size: 12px; }
+  .btn { padding: 10px 11px; font-size: 13px; }
+  .btn.icon { padding: 8px 11px; }
+  .btn.icon svg { width: 15px; height: 15px; }
+}
+
+/* ---- touchscreens wide enough for the computer layout (an iPad on its side): that layout, with the
+   phones' finger-sized rows, chips and buttons ---- */
+@media (pointer: coarse) and (min-width: 960px) and (min-height: 481px) {
+  .chip { height: 26px; padding: 0 9px; }
+  .icon-chip svg { width: 17px; height: 17px; }
+  .out { height: 32px; }
+  .body-btn { padding-top: 11px; padding-bottom: 11px; }
+  .exp { width: 34px; }
+  .exp svg { width: 9px; height: 9px; }
+  .check { padding-top: 11px; padding-bottom: 11px; }
+  .slider-ends button { padding: 6px 0; }
+  .round { width: 38px; height: 38px; }
+  .btn.icon { padding: 9px 11px; }
+}
+
 /* ---- small screens: phones, upright and on their side, and tablets held upright (iPad mini to
-   iPad Pro 11"): below 960 px the information panel and the time controls (440 + 460 px and three
-   gaps) no longer fit side by side. The same query is PHONE in main.js. ---- */
+   iPad Pro 11"): below 960 px the information panel and the time controls (450 + 450 px and three
+   gaps) no longer fit side by side. The same query is PHONE in main.js. Tablets and the wider phones
+   on their side get some of the computer layout back further down. ---- */
 @media (max-width: 959px), (max-height: 480px) {
   :root { --gap: 12px; }
   .clock { font-size: 28px; }
@@ -354,6 +415,7 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
      in the same place: 9 px above it) */
   .info-min { margin: -5px -8px -5px 0; }
   .info .info-desc { font-size: 15px; }
+  .facts, .info details { font-size: 11px; }
   /* compact: the description and the main figures; tapping adds the rest */
   .info:not(.expanded) details, .info:not(.expanded) .facts .x { display: none; }
   /* the guide and the list of events as wide as the panels at the bottom (placeSheet in main.js
@@ -364,20 +426,49 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
   .info.expanded .info-body::after { content: 'Tap for less'; }
 }
 @media (max-width: 359px) { .clock { font-size: 24px; } }
-/* narrow phones: the value alone, and slightly smaller buttons, so the first row of the time
-   controls still fits "−17 min/s" */
+/* most phones: the value alone (SPEED and the longest value, "−1.8 min/s", need 122 px, which only
+   phones from 430 px wide leave it in the first row of the time controls), and on narrow ones slightly
+   smaller buttons too, so that the value still fits */
+@media (max-width: 429px) { .speed-cap .kicker { display: none; } }
 @media (max-width: 389px) {
-  .speed-cap .kicker { display: none; }
   .timectl { column-gap: 6px; }
   .round { width: 36px; height: 36px; }
   .btn.icon { padding: 9px; }
 }
 /* phones on their side: the information panel and the time controls share the bottom edge */
 @media (max-height: 480px) and (min-width: 561px) {
+  :root { --ctl-w: min(400px, 52%); }
   .clock { font-size: 22px; margin-top: 5px; }
   .date-row { margin-top: 2px; }
-  .timectl { left: auto; width: min(400px, 52%); }
-  .info { right: auto; width: min(360px, calc(100% - min(400px, 52%) - var(--gl) - var(--gr) - var(--gap))); bottom: var(--gb); max-height: calc(100% - var(--info-top, 96px) - var(--gap) - var(--gb)); }
+  .timectl { left: auto; width: var(--ctl-w); }
+  .info { right: auto; width: min(360px, calc(100% - var(--ctl-w) - var(--gl) - var(--gr) - var(--gap))); bottom: var(--gb); max-height: calc(100% - var(--info-top, 96px) - var(--gap) - var(--gb)); }
+}
+/* the time controls in one row, as on computers, where they are wide enough for it: on tablets held
+   upright and on phones on their side from 740 px (there, a row less keeps more of the short screen
+   free; on smaller ones, like an iPhone SE, the slider keeps its own row) */
+@media (min-width: 700px) and (max-width: 959px) and (min-height: 481px), (max-height: 480px) and (min-width: 740px) {
+  .timectl { padding: 8px 10px; gap: 8px; grid-template-areas: "play rev speed when events now"; }
+  .speed-box { display: block; }
+  .speed-cap { justify-content: space-between; margin: 0 0 3px; }
+  .speed-box input[type=range] { height: 18px; }
+}
+@media (max-height: 480px) and (min-width: 740px) {
+  :root { --ctl-w: min(440px, 55%); }
+  /* folded, as tall as the time controls beside it (as on computers) */
+  .info.min { display: flex; min-height: var(--ctl-h, 56px); padding-top: 0; padding-bottom: 0; }
+}
+/* tablets held upright (iPad mini to iPad Pro 11"): the panels at the bottom stay stacked across the
+   screen as on phones (narrower, they left a ragged gap under the bodies panel), the description
+   kept to a line that reads well; the clock and the tabs as on computers, the rows finger-sized as on
+   phones */
+@media (min-width: 700px) and (max-width: 959px) and (min-height: 481px) {
+  .clock { font-size: 40px; }
+  .date { font-size: 19px; }
+  .right { --bar-h: 48px; }
+  .tab-tx { display: block; }
+  .tab-ic { width: 16px; height: 16px; }
+  .bodies { width: 184px; }
+  .info .info-desc { max-width: 36em; font-size: 16px; }
 }
 @media (max-height: 600px) and (min-height: 481px) and (min-width: 960px) {
   .clock { font-size: 28px; }

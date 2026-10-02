@@ -28,7 +28,7 @@ GitHub Pages serves the repository as-is.
   panel, and choosing the one shown folds the panel; Guide opens the Guide. On computers the list
   stays as it was left (remembered); on phones the panel starts folded and folds again when the view
   is tapped. Esc closes the settings. On phones the tabs show only their icons, and the panel is only
-  as wide as they are, so the clock beside it keeps its room.
+  as wide as they are, so the clock beside it keeps its room (tablets held upright keep the names).
 - The Guide and the eclipses list close again from their own button, with a click or tap outside
   them, or with Esc. They cover none of the panels. On computers they are centred on the screen and
   moved only as far as they must be to clear the panels beside them; where those leave too little
@@ -38,7 +38,12 @@ GitHub Pages serves the repository as-is.
   information panel folds too. Both open again when it closes.
 - Below 960 px wide (phones, and tablets held upright: iPad mini to iPad Pro 11") or 480 px tall,
   the compact phone layout is used ("on phones" in this list), as the information panel and the
-  time controls no longer fit side by side.
+  time controls no longer fit side by side. Tablets held upright (700–959 px) keep the computer's
+  clock, tab names and one-row time controls, and the description in the information panel keeps
+  to a readable line. Phones on their side from 740 px wide also get
+  the one-row time controls. Touchscreens wide enough for the computer layout (an iPad on its side)
+  get the phones' finger-sized rows and buttons, and screens from 1680 × 1000 px a size larger
+  type, panels and margins. The folded information panel is as tall as the time controls beside it.
 - The settings are tick boxes: Orbits, Labels, Moons, Spin axis, Stars, Milky Way, Sun glare,
   Cities (Earth's night lights) and Lock, then two sliders with reality at their left end, labelled
   Real: Scale (real scale to the overview, Overview) and Night sides (black, as the Sun alone
@@ -53,7 +58,8 @@ GitHub Pages serves the repository as-is.
   the right; `[` `]` move it a step. A caption above it reads SPEED and the value: a multiple of
   real time up to 60× (`1×`, `10×`), then time per second (`5 min/s`, `2 d/s`, `1 yr/s`), with a −
   when reversed; paused, it is dimmed and Play resumes at it. On phones the slider has a row of
-  its own.
+  its own (not on tablets held upright, or on phones on their side from 740 px), and below 430 px
+  wide the caption shows the value alone, as SPEED and "−1.8 min/s" do not both fit.
 - The eye beside the clock's time zone, or `H`, hides the whole interface; a hint says for 3 s how to bring it back: a click
   or tap on empty space (or `H`). Drags, pinches and clicks on bodies or labels keep turning the view
   and choosing bodies without bringing it back. The hidden state is not remembered.
