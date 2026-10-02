@@ -7,7 +7,7 @@
 import * as THREE from '../../vendor/three.min.js';
 
 const ease = t => t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t);
-const _d = new THREE.Vector3(), _o = new THREE.Vector3(), _q = new THREE.Quaternion();
+const _d = new THREE.Vector3(), _o = new THREE.Vector3(), _v = new THREE.Vector3(), _q = new THREE.Quaternion();
 
 export class View {
   constructor(camera, dom) {
@@ -187,14 +187,19 @@ export class View {
   }
 
   /**
-   * Translate the camera and its target together until the target is on the focus body (the
-   * origin). Distance and viewing direction stay as they are, unless the camera would end up
-   * inside or grazing the body (closer than `minDist`): then it backs off to `safeDist`. Given
-   * `toDist`, it ends at that distance instead (the rest of a wheel zoom then dropped).
+   * Bring the focus body (the origin) to the centre without turning the view, at the camera's
+   * distance from its target, unless that would be inside or grazing the body (closer than
+   * `minDist`): then it backs off to `safeDist`. Given `toDist`, it ends at that distance instead
+   * (the rest of a wheel zoom then dropped).
    *
-   * The travel eases in log space: the remaining distance, in units of the camera distance, is
-   * (R + 1)^(1 − e) − 1, so a trip of a thousand camera distances takes about as long to settle as
-   * one of ten, and the body arrives smoothly instead of rushing in over the last few frames.
+   * The way there is set by where the camera is seen from the body (update), not by sliding the
+   * target over: the camera's distance from the body changes geometrically, and its direction from
+   * the body turns along the shorter arc onto the viewing direction, both by the same eased share
+   * of what is left. The body therefore grows or shrinks steadily and drifts steadily to the
+   * centre; a trip of a thousand camera distances settles about as soon as one of ten. (Sliding the
+   * target over in log space, as this used to, left the camera a few moon radii behind it while the
+   * zoom out to a planet's close look was still to come: from Io, Jupiter swelled to ten times its
+   * close look before shrinking back, and with the body behind the camera it flew through it.)
    */
   glide({ minDist = 0, safeDist = minDist, toDist = 0, ms } = {}) {
     const t = this.controls.target, D = this.distance();
@@ -205,8 +210,7 @@ export class View {
     this.tween = {
       kind: 'glide', t0: performance.now(), cancelable: false,
       ms: ms || Math.min(1500, 950 + 160 * Math.log10(1 + R)),
-      from: t.clone(), R, last: 1,
-      fromDist: D, toDist, lastDist: D,
+      lastE: 0, fromDist: D, toDist, lastDist: D,
     };
   }
 
@@ -247,7 +251,7 @@ export class View {
     if (!tw) return;
     tw.fromDist = map(tw.fromDist); tw.toDist = map(tw.toDist);
     if (tw.kind === 'fly') tw.fromTarget.multiplyScalar(f);
-    else { tw.from.multiplyScalar(f); tw.lastDist = map(tw.lastDist); }
+    else tw.lastDist = map(tw.lastDist);
   }
 
   /** per frame, after display positions are known */
@@ -266,20 +270,33 @@ export class View {
     }
     const tw = this.tween;
     if (tw && tw.kind === 'glide') {
-      const k = Math.min(1, (performance.now() - tw.t0) / tw.ms), e = ease(k);
-      const left = tw.R > 1e-6 ? (Math.pow(tw.R + 1, 1 - e) - 1) / tw.R : 0;   // fraction of the trip remaining
-      // move by this frame's step only, so the user's own rotation, zoom or pan during the trip is kept
-      _d.copy(tw.from).multiplyScalar(left - tw.last);
-      tw.last = left;
-      t.add(_d); c.position.add(_d);
-      if (tw.toDist !== tw.fromDist) {
-        // also only this frame's share of the change, so a zoom by hand meanwhile is kept
-        const dist = tw.fromDist * Math.pow(tw.toDist / tw.fromDist, e);
-        _o.subVectors(c.position, t).multiplyScalar(dist / tw.lastDist);
-        c.position.copy(t).add(_o);
-        tw.lastDist = dist;
+      // ended once the eased share is 1 (which it rounds to just before the time is up: a later frame
+      // would divide 0 by 0)
+      const e = ease((performance.now() - tw.t0) / tw.ms), end = e >= 1;
+      // Each frame takes the same share of what is left from the camera as it is, so the user's own
+      // rotation, zoom or pan during the trip is kept: `w` of the remaining turn and of the
+      // remaining log distance stays. The zoom by hand meanwhile is the camera's distance from the
+      // target over the planned one; it carries over to where the camera ends.
+      const w = end ? 0 : (1 - e) / (1 - tw.lastE);
+      const dist = tw.fromDist * Math.pow(tw.toDist / tw.fromDist, e);
+      const u = _d.subVectors(c.position, t), hand = u.length() / tw.lastDist;
+      u.normalize();
+      const r = c.position.length(), endR = tw.toDist * hand;
+      _o.copy(c.position).divideScalar(r);   // the camera's direction from the body
+      const phi = Math.acos(Math.min(1, Math.max(-1, _o.dot(u))));
+      if (phi > 1e-9) {
+        const axis = _v.crossVectors(_o, u);
+        // the body straight behind the camera: any way round will do; over the top, as flyTo
+        if (axis.lengthSq() < 1e-12) {
+          axis.set(0, 1, 0).projectOnPlane(_o);
+          if (axis.lengthSq() < 1e-6) axis.set(1, 0, 0).projectOnPlane(_o);
+        }
+        _o.applyQuaternion(_q.setFromAxisAngle(axis.normalize(), phi * (1 - w)));
       }
-      if (k >= 1) this.tween = null;
+      c.position.copy(_o).multiplyScalar(endR * Math.pow(r / endR, w));
+      t.copy(c.position).addScaledVector(u, -dist * hand);
+      if (end) { t.set(0, 0, 0); this.tween = null; }
+      tw.lastE = e; tw.lastDist = dist;
     } else if (tw) {
       const k = ease((performance.now() - tw.t0) / tw.ms);
       t.copy(tw.fromTarget).multiplyScalar(1 - k);
@@ -296,10 +313,10 @@ export class View {
     const before = this.distance();
     this.controls.update();
     const cd = this.distance();
-    // A glide passes the camera by the body when it starts nearer than the body's size from it (a
-    // close look of Deimos, 23,000 km from Mars, has the camera 50 km out); the limit then pushes it
-    // out. That is not a zoom by hand, which the glide keeps: without this it ended 1.4–4 times
-    // farther out than it was meant to, depending on the frame rate.
+    // Should the limit push the camera out during a glide (the target already near the body, the
+    // camera still nearer to it than the body's size), that is not a zoom by hand, which the glide
+    // keeps: counted as one, it ended 1.4–4 times farther out than meant, depending on the frame
+    // rate (seen when glides still slid the target over and passed the camera by the body).
     if (this.tween && this.tween.kind === 'glide' && cd !== before) this.tween.lastDist *= cd / before;
     // at a limit, the rest of a wheel zoom is dropped, or turning back would first have to undo it
     if (this.zoomLeft < 0 ? cd <= this.controls.minDistance * 1.001 : cd >= maxDist * 0.999) this.zoomLeft = 0;
