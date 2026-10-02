@@ -60,7 +60,9 @@ export class SunGlare {
           // once the disc is large its limb is visibly darker (limb darkening): the rim of bloom must
           // stay below it, or it reads as a white outline
           float bloom = (0.12 + 0.33 * uHalo) * exp(-x / (2.0 + 0.05 * uR));
-          float halo = 0.25 * exp(-x / (8.0 + 0.8 * uR)) + 0.05 / (1.0 + pow(x / (40.0 + 2.0 * uR), 2.0));
+          float L = 40.0 + 2.0 * uR;
+          // the wide tail ends well inside the screen, or it lifts the whole picture like a brightness change
+          float halo = 0.25 * exp(-x / (8.0 + 0.8 * uR)) + 0.04 * (1.0 - smoothstep(0.5 * L, 5.0 * L, x)) / (1.0 + pow(x / L, 2.0));
           // two octaves of streaks around the disc; their brightness varies with uPhase
           float u = atan(q.y, q.x) / 6.2831853 + 0.5;
           float s1 = pow(noiseP(vec2(u * 72.0, uPhase.x), 72.0), 3.0), s2 = pow(noiseP(vec2(u * 167.0, uPhase.y), 167.0), 2.0);
@@ -100,10 +102,13 @@ export class SunGlare {
     const rpx = R / Math.sqrt(Math.max(d * d - R * R, 1e-24)) * (H / 2) / tanF;
     const x = (v.x * 0.5 + 0.5) * W, y = (v.y * 0.5 + 0.5) * H;
     // behind the camera, or so far off screen that not even the glare reaches in
-    const reach = 150 + 3 * rpx;
-    this.on = v.z < 1 && x > -reach && x < W + reach && y > -reach && y < H + reach;
+    // The glare goes with the disc: full while any of it is on screen, gone within 40 px of it leaving.
+    // (A veil that outlived the Sun by a margin and then cut out looked like the screen's brightness changing.)
+    const out = Math.hypot(Math.max(-x, 0, x - W), Math.max(-y, 0, y - H)) - rpx;
+    const edge = 1 - smooth01(out / 40);
+    this.on = v.z < 1 && edge > 0;
     if (!this.on) { this.vis = 0; return; }
-    this.vis = visibleFraction(camera, sunPos, R, occluders);
+    this.vis = visibleFraction(camera, sunPos, R, occluders) * edge;
     this.on = this.vis > 0.001;
     this.halo = Math.max(0, Math.min(1, (90 - rpx) / 60));
     this.dir.copy(sunPos).sub(camera.position).normalize();
@@ -121,6 +126,8 @@ export class SunGlare {
 
   render(renderer) { if (this.on) renderer.render(this.scene, this.camera); }
 }
+
+function smooth01(t) { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); }
 
 // fraction of the Sun's disc not hidden by the drawn spheres, sampled at the centre and two rings
 const _v = new THREE.Vector3(), _s = new THREE.Vector3(), _u = new THREE.Vector3(), _w = new THREE.Vector3(), _ray = new THREE.Vector3(), _oc = new THREE.Vector3(), _t = new THREE.Vector3();

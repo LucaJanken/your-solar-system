@@ -78,7 +78,7 @@ export class Stars {
           // perceived size grows slowly with flux; faint stars stay 1 px and fade instead
           float s = clamp(5.2 - 0.62 * aMag, 1.0, 8.0);
           float ang = acos(clamp(dot(normalize(position), uSunDir), -1.0, 1.0));
-          float glare = uDim * (0.4 + 0.6 * exp(-ang / 0.2));
+          float glare = uDim * exp(-ang / 0.25);   // local: a sky-wide dimming reads as screen brightness
           vA = clamp(1.15 - 0.16 * aMag, 0.18, 1.0) * uGain * (1.0 - glare);
           vCol = aCol;
           gl_PointSize = s * uPx;
