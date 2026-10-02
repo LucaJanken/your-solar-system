@@ -189,21 +189,24 @@ export class View {
   /**
    * Translate the camera and its target together until the target is on the focus body (the
    * origin). Distance and viewing direction stay as they are, unless the camera would end up
-   * inside or grazing the body (closer than `minDist`): then it backs off to `safeDist`.
+   * inside or grazing the body (closer than `minDist`): then it backs off to `safeDist`. Given
+   * `toDist`, it ends at that distance instead (the rest of a wheel zoom then dropped).
    *
    * The travel eases in log space: the remaining distance, in units of the camera distance, is
    * (R + 1)^(1 − e) − 1, so a trip of a thousand camera distances takes about as long to settle as
    * one of ten, and the body arrives smoothly instead of rushing in over the last few frames.
    */
-  glide({ minDist = 0, safeDist = minDist, ms } = {}) {
+  glide({ minDist = 0, safeDist = minDist, toDist = 0, ms } = {}) {
     const t = this.controls.target, D = this.distance();
     const R = t.length() / Math.max(D, 1e-12);
-    if (R < 1e-6 && D >= minDist) { this.tween = null; return; }
+    if (toDist) this.zoomLeft = 0;
+    else toDist = D < minDist ? safeDist : D;
+    if (R < 1e-6 && Math.abs(toDist / D - 1) < 1e-9) { this.tween = null; return; }
     this.tween = {
       kind: 'glide', t0: performance.now(), cancelable: false,
       ms: ms || Math.min(1500, 950 + 160 * Math.log10(1 + R)),
       from: t.clone(), R, last: 1,
-      fromDist: D, toDist: D < minDist ? safeDist : D, lastDist: D,
+      fromDist: D, toDist, lastDist: D,
     };
   }
 
@@ -290,8 +293,14 @@ export class View {
     this.controls.minDistance = nearFocus ? focusRadius * 1.02 : 1e-9;
     this.controls.maxDistance = maxDist;
     this._zoomStep(dt);
+    const before = this.distance();
     this.controls.update();
     const cd = this.distance();
+    // A glide passes the camera by the body when it starts nearer than the body's size from it (a
+    // close look of Deimos, 23,000 km from Mars, has the camera 50 km out); the limit then pushes it
+    // out. That is not a zoom by hand, which the glide keeps: without this it ended 1.4–4 times
+    // farther out than it was meant to, depending on the frame rate.
+    if (this.tween && this.tween.kind === 'glide' && cd !== before) this.tween.lastDist *= cd / before;
     // at a limit, the rest of a wheel zoom is dropped, or turning back would first have to undo it
     if (this.zoomLeft < 0 ? cd <= this.controls.minDistance * 1.001 : cd >= maxDist * 0.999) this.zoomLeft = 0;
     // logarithmic depth buffer: a generous range costs nothing, but the near plane must stay in

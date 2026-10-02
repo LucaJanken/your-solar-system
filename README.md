@@ -65,15 +65,30 @@ GitHub Pages serves the repository as-is.
   the clock shows them (local time, UTC, or UT in Scientific).
 - The clock shows Local time, UTC, or Scientific (UT, with TT, ΔT and the Julian Date); the
   choice is remembered. An Extrapolated tag appears outside the validated 1800–2050.
-- Selecting a body glides the camera over to it, keeping zoom and viewing angle, but no nearer
-  than a comfortable view of it (its close look: Earth's close look would be inside Jupiter).
-  Selecting it again, once it is centred, flies straight to the close look without turning the
-  view: in, or back out if zoomed in nearer by hand; already there, it does nothing. Zooming out
-  is left to the wheel or a pinch (`Esc`: the whole system). Nothing is remembered between
-  choices. A change of scale keeps a close look, a planet's moons in view and the whole system as
-  they are, and whatever lies between in proportion. In the view, a body's dot under the pointer
-  is chosen before a label beside it. Lock keeps the camera travelling with the selected body;
-  locking again after drifting catches up with it. Spin axis shows its rotation axis.
+- The camera steps between a few views of the body it is centred on: its close look (a comfortable
+  view of it); the inner planets for the Sun, or its moons for a planet with moons; and the whole
+  system. Selecting an outer planet or the Sun glides the camera over to it without turning the
+  view. From the old body's moons, inner planets or close look (or nearer), it arrives at the new
+  body's moons (the inner planets for the Sun), so Earth's close look goes on to Jupiter's moons;
+  farther out, from the whole system, it keeps its zoom, but no nearer than that view. Coming from
+  one of its own moons (for the Sun: from an inner planet or its moon), it keeps the zoom instead,
+  but no nearer than its close look, so a close look of Io goes to a close look of Jupiter. Selecting a
+  moon or an inner planet always glides over at the same zoom, no nearer than its close look (a
+  moon, Mercury, Venus) or its moons (Earth, Mars). Selecting a body again, once it is centred,
+  flies to the next of its views nearer than the camera is: whole system → moons (inner planets for
+  the Sun) → close look; a moon, Mercury or Venus goes straight to its close look. Zoomed in nearer
+  than that by hand, it flies back out to the close look; already there, it does nothing. Under the
+  date (and the scientific times), a chip with a turning arrow, named for the next view out (Moons,
+  Inner planets or Whole system; `Backspace`), zooms back out one view at a time, keeping the body
+  in the centre: out from a moon's close look come its planet's moons, and the inner planets (and
+  their moons) also step out through the inner planets, framed around them. It is hidden from the
+  whole system on out, keeping its place so that nothing below it moves. It is not a history:
+  nothing is remembered between choices, and the same view always answers the same way. The wheel
+  and a pinch still zoom freely; `Esc` shows the whole system around the Sun. A change of scale
+  keeps a close look, a planet's moons, the inner planets and the whole system as they are, and
+  whatever lies between in proportion. In the view, a body's dot under the pointer is chosen before
+  a label beside it. Lock keeps the camera travelling with the selected body; locking again after
+  drifting catches up with it. Spin axis shows its rotation axis.
 - Dragging (one finger) turns the view around the focus; scroll or pinch zooms. The wheel eases each
   step in, and its steps grow (up to 8×) the faster it is turned, so a quick spin crosses from a
   close look to the whole system. Moving the view sideways (right- or shift-drag, arrow keys,
