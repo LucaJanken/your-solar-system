@@ -118,8 +118,9 @@ function innerDistance(name, sc = scale) {
   if (p !== 'Sun' && !INNER.has(p)) return 0;
   return frameDistance(1.08 * sc.helio(1.666 * AU_KM) + (p === 'Sun' ? 0 : sc.helio(Math.hypot(...snap.bodies[p].pos))));
 }
-// the camera distance that frames a circle of drawn radius R in the ecliptic, as above
-function frameDistance(R) {
+// the tangents of the half-angles across and up that the part of the screen the panels leave free
+// spans around the focus (which is in the middle of it)
+function freeTans() {
   const W = stage.clientWidth || 1, H = stage.clientHeight || 1;
   // the open bodies list is in the way (on computers), the toolbar it folds to, across the top
   // corner, is not. (Judged at 40% of the height, the planets' list alone ended just short of it and
@@ -127,10 +128,13 @@ function frameDistance(R) {
   const col = $('bodies').getBoundingClientRect();
   const right = !hud.hidden && col.bottom > H * 0.25 ? col.left - 12 : W;
   const tanV = Math.tan(DEFAULT_FOV * Math.PI / 360);
-  const tanX = tanV * Math.max(40, Math.min(W / 2, right - W / 2)) / (H / 2);
-  const tanY = tanV * Math.min(H, free.bottom - free.top) / H;
+  return { x: tanV * Math.max(40, Math.min(W / 2, right - W / 2)) / (H / 2), y: tanV * Math.min(H, free.bottom - free.top) / H };
+}
+// the camera distance that frames a circle of drawn radius R in the ecliptic, as above
+function frameDistance(R) {
+  const tan = freeTans();
   // the near side of the orbit is the farthest up or down the screen
-  return Math.max(R / tanX, R * Math.cos(SYSTEM_ELEV) + R * Math.sin(SYSTEM_ELEV) / tanY);
+  return Math.max(R / tan.x, R * Math.cos(SYSTEM_ELEV) + R * Math.sin(SYSTEM_ELEV) / tan.y);
 }
 // The overview's viewing direction: from the side the camera is on now, at SYSTEM_ELEV above the
 // ecliptic, for which systemDistance is fitted (a close look at a planet is often from nearly in
@@ -144,13 +148,14 @@ function systemDir() {
 const drawnExtent = (name, sc = scale) => { const d = BY_NAME[name]; return drawnRadius(name, sc) * Math.max(...d.shape) / meanRadius(d); };
 const focusDistance = name => name === 'Sun' ? systemDistance() : closeDistance(name);
 // A comfortable distance to look at a body from: it spans about 40% of the narrower side of the
-// part of the screen the panels leave free (so a phone held upright does not crop it), Saturn's
-// rings included.
+// screen (so a phone held upright does not crop it), Saturn's rings included, but no more than 3/4
+// of the height the panels leave free. (40% of that height, as before, left a body on a phone held
+// sideways, between the clock and the panels below, at 70 px.)
 function closeDistance(name, sc = scale) {
   const d = BY_NAME[name], W = stage.clientWidth || 1, H = stage.clientHeight || 1;
   const extent = Math.max(drawnExtent(name, sc), d.rings && d.rings.outerKm ? drawnRadius(name, sc) * d.rings.outerKm / meanRadius(d) : 0);
-  const side = Math.min(W, H, free.bottom - free.top);
-  return extent / Math.sin(Math.atan(0.4 * Math.tan(DEFAULT_FOV * Math.PI / 360) * side / H));
+  const span = Math.min(0.4 * Math.min(W, H), 0.75 * (free.bottom - free.top));
+  return extent / Math.sin(Math.atan(Math.tan(DEFAULT_FOV * Math.PI / 360) * span / H));
 }
 // How far out the camera may go: far enough for the whole of Pluto's orbit (out to 49 AU from the
 // Sun) to fit, with a margin, in the narrower side of the part of the screen the panels leave free,
@@ -167,14 +172,16 @@ function maxDistance() {
 const free = { top: 0, bottom: Infinity };
 let viewShift = 0, shiftTarget = 0, shiftApplied = null;
 function measureFree() {
-  const W = stage.clientWidth, H = stage.clientHeight, cx = W / 2;
+  const W = stage.clientWidth, H = stage.clientHeight, cx = W / 2, band = 0.2 * Math.min(W, H) + 12;
   free.top = 0; free.bottom = H;
   if (hud.hidden) { shiftTarget = 0; return; }
   for (const el of [document.querySelector('header.time'), $('info'), document.querySelector('.timectl')]) {
     if (!el.offsetParent) continue;
     const r = el.getBoundingClientRect();
-    // only panels across the middle of the screen are in the way (the desktop layout keeps to the sides)
-    if (r.left > cx || r.right < cx) continue;
+    // only panels across the middle of the screen, where a close look is drawn, are in the way (the
+    // desktop layout keeps to the sides; on a phone held sideways the two below stop just short of
+    // the centre line, which counted alone left them over the lower part of the body)
+    if (r.left > cx + band || r.right < cx - band) continue;
     if (r.top < H / 2 && r.bottom < H * 0.4) free.top = Math.max(free.top, r.bottom);
     else free.bottom = Math.min(free.bottom, r.top);
   }
@@ -303,10 +310,15 @@ function paintOut() {
   hudBoxes = null;
 }
 
-// The view of a body's neighbours: for a planet its moons, for a moon its planet's (three times the
-// outermost one's drawn distance, at least four close looks of the planet); 0 for the Sun and planets
-// without moons. The moons preset, and an anchor of mapDistance so that it keeps through a change of
-// scale.
+// The view of a body's neighbours: for a planet its moons, for a moon its planet's; 0 for the Sun
+// and planets without moons. The outermost moon's orbit, as a sphere (so that it fits however it is
+// tilted, Uranus's and Pluto's seen nearly face-on), spans 85% of the screen's height and of the
+// width the panels leave free, whichever is narrower: three times its drawn distance on a screen
+// wider than high, as this used to be everywhere, which on a phone held upright ran the orbits off
+// both sides. Up and down it may pass behind the panels (fitted between them, on a phone held
+// sideways, the orbits, mostly seen aslant, came out a sixth of the width). At least four close
+// looks of the planet. The moons preset, and an anchor of mapDistance so that it keeps through a
+// change of scale.
 function moonsDistance(name, sc = scale) {
   const def = BY_NAME[name];
   if (name === 'Sun') return 0;
@@ -315,7 +327,9 @@ function moonsDistance(name, sc = scale) {
   const span = m => { const p = BY_NAME[m].parent; return sc.moon(m, p, meanRadius(BY_NAME[p]), Math.hypot(...snap.bodies[m].rel.pos)); };
   let r = 0;
   for (const m of BODIES) if (m.parent === name) r = Math.max(r, span(m.name));
-  return r && Math.max(3 * r, closeDistance(name, sc) * 4);
+  if (!r) return 0;
+  const tan = Math.min(freeTans().x, Math.tan(DEFAULT_FOV * Math.PI / 360));
+  return Math.max(r / Math.sin(Math.atan(0.85 * tan)), closeDistance(name, sc) * 4);
 }
 
 // ---------------------------------------------------------------- scale changes
