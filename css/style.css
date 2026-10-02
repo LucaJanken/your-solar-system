@@ -125,6 +125,12 @@ a { color: oklch(0.84 0.07 230); }
 .check[aria-checked="true"] i { border-color: oklch(var(--accent-lch) / 0.6); }
 .check[aria-checked="true"] i::after { opacity: 1; }
 .settings .slider-title { margin-top: 14px; }
+/* a choice of three (Body info): one row of buttons, the chosen one lit as a tab is */
+.seg { display: flex; margin: 2px 12px 0; border: 1px solid var(--line); }
+.seg button { flex: 1 1 0; min-width: 0; border: 0; border-left: 1px solid var(--line); background: none; padding: 7px 0; font: 500 11px/1 var(--serif); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); }
+.seg button:first-child { border-left: 0; }
+@media (hover: hover) { .seg button:hover { color: var(--text-2); } }
+.seg button[aria-checked="true"] { background: var(--accent-soft); color: var(--accent-text); }
 .settings .slider-title.first { margin-top: 10px; padding-top: 11px; border-top: 1px solid var(--line); }
 .settings input[type=range] { display: block; width: calc(100% - 24px); margin: 0 12px; }
 .slider-ends { display: flex; justify-content: space-between; padding: 0 12px; }
@@ -191,11 +197,12 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
 .info summary { cursor: pointer; color: var(--text-3); font: 500 12px/1.35 var(--serif); letter-spacing: 0.12em; text-transform: uppercase; }
 .info .note { margin-top: 8px; font: 400 13.5px/1.4 var(--serif); color: var(--text-3); }
 
-/* ---- time controls (bottom right) ---- */
+/* ---- time controls (bottom, in the middle) ---- */
 /* one row: play, reverse, the speed slider under its caption, the calendar, eclipses & transits, Now
-   (on phones the slider takes a row of its own); as wide as the information panel, so the two bottom
-   corners match */
-.timectl { right: var(--gr); bottom: var(--gb); width: 450px; padding: 10px 12px; display: grid; grid-template-columns: auto auto 1fr auto auto auto; grid-template-areas: "play rev speed when events now"; align-items: center; gap: 8px; }
+   (on phones the slider takes a row of its own); as wide as the information panel. In the middle of
+   the bottom edge, under the body in the centre, or only as far right of it as clears the information
+   panel when that is shown beside them (--ctl-left: layoutPanels in main.js) */
+.timectl { left: var(--ctl-left, calc(50% - 225px)); bottom: var(--gb); width: 450px; padding: 10px 12px; display: grid; grid-template-columns: auto auto 1fr auto auto auto; grid-template-areas: "play rev speed when events now"; align-items: center; gap: 8px; }
 #playBtn { grid-area: play; } #revBtn { grid-area: rev; } .speed-box { grid-area: speed; }
 .when { grid-area: when; } #eventsBtn { grid-area: events; } #nowBtn { grid-area: now; }
 .btn.icon svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.3; }
@@ -310,6 +317,28 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
 .hover-ring { position: absolute; left: 0; top: 0; border: 1px solid var(--chart-ink); border-radius: 50%; opacity: 0; pointer-events: none; transition: opacity 0.15s; box-shadow: 0 0 6px rgb(var(--ink-rgb) / 0.12), inset 0 0 6px rgb(var(--ink-rgb) / 0.08); }
 .hover-ring.on { opacity: 0.55; }
 
+/* ---- the info card (card.js): a speech bubble beside the selected body in a close look, placed,
+   scaled and faded by main.js. Its outline, tail included, is an SVG path (fill and edge) and the element's
+   clip-path. Hidden only once it has faded out, and answering the pointer only while it can be read. ---- */
+/* (scaled about its top left corner; no will-change: transform, which kept the text a bitmap that blurred as it grew) */
+.card { position: absolute; left: 0; top: 0; z-index: 1; opacity: 0; pointer-events: none; transform-origin: 0 0; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); transition: opacity 0.35s, visibility 0s; }
+.card.on { pointer-events: auto; }
+.card.off { visibility: hidden; transition: opacity 0.35s, visibility 0s 0.35s; }
+.card-shape { position: absolute; inset: 0; width: 100%; height: 100%; }
+.card-shape path { fill: var(--panel); stroke: var(--line-strong); stroke-width: 1; }
+.card-body { position: relative; width: min(300px, calc(100vw - 2 * var(--gap))); padding: 13px 15px 12px; }
+.card.tail-left .card-body { margin-left: 13px; }   /* TAIL in card.js */
+.card-head { display: flex; align-items: flex-start; gap: 10px; }
+.card-type { font: 500 11px/1 var(--serif); letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent-text); }
+.card-name { margin-top: 6px; font: 500 25px/1 var(--serif); letter-spacing: 0.01em; }
+/* the close button: the information panel's fold button, with a cross */
+.card-close { flex: none; display: grid; place-items: center; width: 25px; height: 25px; margin: -3px -4px 0 auto; padding: 0; border: 1px solid var(--line); background: rgb(var(--ink-rgb) / 0.03); color: var(--text-2); }
+.card-close svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; }
+@media (hover: hover) { .card-close:hover { border-color: var(--line-strong); color: var(--text); } }
+.card-desc { margin: 10px 0 0; font: 400 16px/1.4 var(--serif); color: var(--text-2); text-wrap: pretty; }
+.card-more { display: block; margin: 11px 0 0; border: 0; background: none; padding: 2px 0; font: 500 12px/1 var(--serif); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); }
+@media (hover: hover) { .card-more:hover { color: var(--accent-text); } }
+
 #toast { position: absolute; left: 50%; bottom: calc(var(--ctl-h, 130px) + var(--gb) + 12px); transform: translateX(-50%); padding: 8px 12px; background: rgb(var(--panel-rgb) / 0.9); border: 1px solid var(--line-strong); font: 400 14px/1.3 var(--serif); color: var(--text); opacity: 0; transition: opacity 0.3s; pointer-events: none; max-width: calc(100% - 32px); text-align: center; }
 #toast.on { opacity: 1; }
 
@@ -341,6 +370,8 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
   .settings input[type=range] { width: calc(100% - 26px); margin: 0 13px; }
   .slider-ends { padding: 0 13px; }
   .slider-ends button { font-size: 13px; }
+  .seg { margin: 2px 13px 0; }
+  .seg button { font-size: 12px; }
   .info, .timectl { width: 490px; }
   .info { padding: 16px 17px; }
   .info-name { font-size: 27px; }
@@ -397,6 +428,11 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
   /* the type and padding of the planet names on the Bodies tab, so the two tabs match; with the
      tick box this leaves a label 83 px in the 132 px panel (Sun glare, the longest, is 77) */
   .check { padding: 11px 14px; line-height: 1; letter-spacing: 0.08em; }
+  /* Card, Panel and None share the row, a third each: a little wider than the sliders' (and with
+     tighter spacing) to leave each word a few px either side; as tall as on computers (the rows'
+     finger-sized padding made the boxes look swollen around such short words) */
+  .seg { margin: 2px 8px 0; }
+  .seg button { padding: 8px 0; font-size: 10px; letter-spacing: 0.02em; }
   /* True and Overview share a 106 px row: smaller, so a clear gap stays between them */
   .slider-ends button { font-size: 10px; letter-spacing: 0.06em; }
   /* finger-sized rows */
@@ -429,6 +465,10 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
      sets only their height and how far down they are) */
   .sheet, #guide { left: var(--gl); right: var(--gr); width: auto; transform: translateY(-50%); }
   /* say that the compact panel opens up */
+  .card-body { padding: 11px 12px 10px; }
+  .card-name { font-size: 22px; }
+  .card-desc { margin-top: 8px; font-size: 15px; line-height: 1.35; }
+  .card-more { margin-top: 9px; font-size: 11px; }
   .info-body::after { content: 'More data'; display: block; margin-top: 9px; font: 500 11px/1 var(--serif); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); }
   .info.expanded .info-body::after { content: 'Less data'; }
 }
@@ -447,7 +487,7 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
   :root { --ctl-w: min(400px, 52%); }
   .clock { font-size: 22px; margin-top: 5px; }
   .date-row { margin-top: 2px; }
-  .timectl { left: auto; width: var(--ctl-w); }
+  .timectl { left: var(--ctl-left, auto); width: var(--ctl-w); }
   .info { right: auto; width: min(360px, calc(100% - var(--ctl-w) - var(--gl) - var(--gr) - var(--gap))); bottom: var(--gb); max-height: calc(100% - var(--info-top, 96px) - var(--gap) - var(--gb)); }
 }
 /* the time controls in one row, as on computers, where they are wide enough for it: on tablets held

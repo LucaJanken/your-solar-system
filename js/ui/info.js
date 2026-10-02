@@ -41,10 +41,11 @@ export class InfoPanel {
     // it, and the minimize button folds it again. On phones an open panel is compact, and tapping it
     // expands it.
     this.minBtn = document.getElementById('infoMin');
+    this.onFold = () => {};   // folded with the – button (main.js: back to the info card)
     this.setMin(true);
     this.el.addEventListener('click', e => {
       if (e.target.closest('summary')) return;
-      if (e.target.closest('#infoMin')) this.setMin(!this.min);
+      if (e.target.closest('#infoMin')) { this.setMin(!this.min); if (this.min) this.onFold(); }
       else if (this.min) this.setMin(false);
       else {
         const on = this.el.classList.toggle('expanded');

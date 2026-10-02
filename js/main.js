@@ -12,6 +12,7 @@ import { Labels } from './scene/labels.js';
 import { SunGlare } from './scene/glare.js';
 import { SUN_INTENSITY } from './scene/shaders.js';
 import { InfoPanel } from './ui/info.js';
+import { InfoCard, TAIL } from './ui/card.js';
 import { HudVisibility, onTap } from './ui/hud.js';
 import { fmtDate, fmtTime, tzName, localInput, parseLocalInput, civil, fmtRate } from './ui/format.js';
 
@@ -33,6 +34,7 @@ const state = {
   dir: 1,            // +1 forward, −1 backward (the reverse button)
   // the switches in the settings (with view.lock, the scale and nightLight, kept across reloads: see saveSettings)
   show: { orbits: true, labels: true, moons: true, axis: true, stars: true, milkyWay: true, glare: true, cities: true },
+  info: 'card',      // Body info in the settings: 'card', 'panel' or 'none' (kept across reloads too)
   nightLight: 0,     // the Night sides slider: 0 real (black), 1 lit
 
   scaleTarget: 1,
@@ -70,6 +72,21 @@ const stars = new Stars();
 const glare = new SunGlare();
 const view = new View(camera, renderer.domElement);
 const info = new InfoPanel();
+// The info card and the information panel are the two ways to read about a body, chosen under Body
+// info in the settings (state.info), which can also have neither. With the card, the panel is not
+// shown until the card's More data opens it (as it looks on its own), and its – button then closes
+// it, back to the card (dataOpen). Closed, the card stays away until a body is chosen (again).
+let cardDismissed = null, dataOpen = false;
+const card = new InfoCard($('card'), {
+  onClose: () => { cardDismissed = state.selected; wake(); },
+  onMore: () => { dataOpen = true; info.setMin(false); paintInfo(); },
+});
+info.onFold = () => { if (state.info === 'card') { dataOpen = false; paintInfo(); } };
+function paintInfo() {
+  const el = $('info'), hide = state.info === 'none' || (state.info === 'card' && !dataOpen);
+  if (el.hidden !== hide) { el.hidden = hide; hudBoxes = null; }
+  wake();
+}
 // a clicked label chooses its body, unless a body's dot is right under the pointer (see bodyAt); a
 // label pressed from the keyboard (no pointer, detail 0) always chooses its own
 const labels = new Labels($('labels'), BODIES, (name, e) => select(e.detail && bodyAt(e.clientX, e.clientY, true) || name, true), () => updateHover());
@@ -155,10 +172,18 @@ const focusDistance = name => name === 'Sun' ? systemDistance() : closeDistance(
 // of the height the panels leave free. (40% of that height, as before, left a body on a phone held
 // sideways, between the clock and the panels below, at 70 px.)
 function closeDistance(name, sc = scale) {
-  const d = BY_NAME[name], W = stage.clientWidth || 1, H = stage.clientHeight || 1;
-  const extent = Math.max(drawnExtent(name, sc), d.rings && d.rings.outerKm ? drawnRadius(name, sc) * d.rings.outerKm / meanRadius(d) : 0);
-  const span = Math.min(0.4 * Math.min(W, H), 0.75 * (free.bottom - free.top));
-  return extent / Math.sin(Math.atan(Math.tan(DEFAULT_FOV * Math.PI / 360) * span / H));
+  const H = stage.clientHeight || 1;
+  return frameExtent(name, sc) / Math.sin(Math.atan(Math.tan(DEFAULT_FOV * Math.PI / 360) * closeSpan() / H));
+}
+// how far a close look frames out from the body's centre: its drawn radius, or its rings'
+function frameExtent(name, sc = scale) {
+  const d = BY_NAME[name];
+  return Math.max(drawnExtent(name, sc), d.rings && d.rings.outerKm ? drawnRadius(name, sc) * d.rings.outerKm / meanRadius(d) : 0);
+}
+// the close look's size on screen (px across)
+function closeSpan() {
+  const W = stage.clientWidth || 1, H = stage.clientHeight || 1;
+  return Math.min(0.4 * Math.min(W, H), 0.75 * (free.bottom - free.top));
 }
 // How far out the camera may go: far enough for the whole of Pluto's orbit (out to 49 AU from the
 // Sun) to fit, with a margin, in the narrower side of the part of the screen the panels leave free,
@@ -171,13 +196,16 @@ function maxDistance() {
 }
 // On phones the clock covers the top of the screen and the information panel and time controls
 // the lower half, right where the focused body would be. The projection is shifted (a view offset,
-// so orbiting still turns about the body) to put the focus in the middle of the part left free.
+// so orbiting still turns about the body) to put the focus in the middle of the part left free
+// (baseShift, up or down), and further aside to make room for the info card (cardShift).
 const free = { top: 0, bottom: Infinity };
-let viewShift = 0, shiftTarget = 0, shiftApplied = null;
+// the offset as setViewOffset takes it (px; the focus is drawn at W/2 − x, H/2 − y), easing to shiftTo
+const shift = { x: 0, y: 0 }, shiftTo = { x: 0, y: 0 };
+let baseShift = 0, shiftApplied = null;
 function measureFree() {
   const W = stage.clientWidth, H = stage.clientHeight, cx = W / 2, band = 0.2 * Math.min(W, H) + 12;
   free.top = 0; free.bottom = H;
-  if (hud.hidden) { shiftTarget = 0; return; }
+  if (hud.hidden) { baseShift = 0; return; }
   for (const el of [document.querySelector('header.time'), $('info'), document.querySelector('.timectl')]) {
     if (!el.offsetParent) continue;
     const r = el.getBoundingClientRect();
@@ -189,17 +217,19 @@ function measureFree() {
     else free.bottom = Math.min(free.bottom, r.top);
   }
   if (free.bottom - free.top < H * 0.2) { free.top = 0; free.bottom = H; }
-  shiftTarget = H / 2 - (free.top + free.bottom) / 2;
+  baseShift = H / 2 - (free.top + free.bottom) / 2;
 }
 function applyShift(dt) {
-  const W = stage.clientWidth, H = stage.clientHeight;
-  viewShift += (shiftTarget - viewShift) * Math.min(1, dt * 8);
-  if (Math.abs(shiftTarget - viewShift) < 0.5) viewShift = shiftTarget;
-  const key = W + 'x' + H + ':' + viewShift.toFixed(1);
+  const W = stage.clientWidth, H = stage.clientHeight, k = Math.min(1, dt * 8);
+  for (const a of ['x', 'y']) {
+    shift[a] += (shiftTo[a] - shift[a]) * k;
+    if (Math.abs(shiftTo[a] - shift[a]) < 0.5) shift[a] = shiftTo[a];
+  }
+  const key = W + 'x' + H + ':' + shift.x.toFixed(1) + ',' + shift.y.toFixed(1);
   if (key === shiftApplied) return;
   shiftApplied = key;
-  if (Math.abs(viewShift) < 0.5) camera.clearViewOffset();
-  else camera.setViewOffset(W, H, 0, viewShift, W, H);
+  if (Math.abs(shift.x) < 0.5 && Math.abs(shift.y) < 0.5) camera.clearViewOffset();
+  else camera.setViewOffset(W, H, shift.x, shift.y, W, H);
 }
 
 // ---------------------------------------------------------------- selection and navigation
@@ -234,6 +264,8 @@ function select(name, fly) {
   openSystemOf(name);
   info.show(name);
   info.update(snap);
+  card.show(name);
+  cardDismissed = null;
   paintList();
   if (fly) {
     camera.fov = DEFAULT_FOV; camera.updateProjectionMatrix();
@@ -460,7 +492,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const elapsed = (now - last) / 1000, dt = Math.min(0.1, elapsed);
   last = now;
-  const active = state.playing || view.tween || view.zoomLeft || scaleAnim || nightAnim || now < wakeUntil || viewShift !== shiftTarget;
+  const active = state.playing || view.tween || view.zoomLeft || scaleAnim || nightAnim || now < wakeUntil || shift.x !== shiftTo.x || shift.y !== shiftTo.y;
   if (!active) {
     if (hudDirty) { lastHud = now; hudDirty = false; updateHud(); }
     return;
@@ -490,6 +522,7 @@ function frame(now) {
   computeDisplay();
   view.update(disp, drawnExtent(view.focus), maxDistance());
   paintOut();
+  const cardK = cardFade();
   applyShift(dt);
   // OrbitControls turns the camera with lookAt, which leaves the view matrix one orientation
   // behind until the render; the labels, picking and glare below project with it
@@ -522,7 +555,9 @@ function frame(now) {
       const r = e.getBoundingClientRect(); return { left: r.left - 4, right: r.right + 4, top: r.top - 4, bottom: r.bottom + 4 };
     });
     measureFree();
+    cardPlan = planCard();
   }
+  const cardBox = placeCard(cardK, W, H);
   const entries = BODIES.map((def, i) => {
     const v = bodies.views[def.name];
     const isMoon = def.parent && def.parent !== 'Sun';
@@ -530,7 +565,9 @@ function frame(now) {
     let prio = def.name === state.selected ? 100 : !def.parent ? 90 : isMoon ? 10 : 50 - i * 0.1;
     // a body hidden because it moves too fast to draw takes its label with it, which would
     // otherwise jump around its orbit from frame to frame
-    return { name: def.name, pos: v.group.position, R: v.R || drawnRadius(def.name), show: v.group.visible, label: state.show.labels, prio, isMoon, parent: def.parent };
+    // the card, once it can be read, names its body
+    const label = state.show.labels && !(cardBox && def.name === state.selected);
+    return { name: def.name, pos: v.group.position, R: v.R || drawnRadius(def.name), show: v.group.visible, label, prio, isMoon, parent: def.parent };
   });
   const labelled = [];
   for (const e of entries) {
@@ -538,7 +575,7 @@ function frame(now) {
     const it = labels.items[e.name];
     if (it.shown) { it.el.style.display = 'none'; it.shown = false; }
   }
-  screenPos = labels.update(camera, W, H, labelled, hudBoxes, state.selected);
+  screenPos = labels.update(camera, W, H, labelled, cardBox ? [...hudBoxes, cardBox] : hudBoxes, state.selected);
   updateHover();
   // the selected body's spin axis, once the body is big enough on screen for it to mean anything
   const sp = screenPos.find(p => p.name === state.selected);
@@ -575,6 +612,131 @@ function moonSpread(e) {
   return px > 26 || e.name === state.selected;
 }
 
+// ---------------------------------------------------------------- the info card
+// The card shows while the camera is in a close look at the selected body, centred on it: fully from
+// 0.75 to 1.35 times the close look's distance, fading out toward 0.55 and 2 (still well short of a
+// planet's moons, at four close looks or more). As it grows and shrinks with the body (placeCard),
+// that keeps its text between about half and twice its size, the fades included. Not with the Info
+// card not chosen in the settings, once closed (until a body is chosen again), while its More data has the
+// information panel open, a sheet is open, the bodies panel covers the view (phones), or the
+// interface is hidden. It fades by the camera's distance from the body as it is, during a flight
+// (choosing the body) just as during a zoom by hand; the view moves aside for it (planCard) by how
+// far the card will show where the camera is heading, so already on the way there.
+const CARD_BAND = [0.55, 0.75, 1.35, 2].map(Math.log);
+function cardBand(q) {
+  const [a, b, c, d] = CARD_BAND, x = Math.log(q);
+  const s = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+  return Math.min(s((x - a) / (b - a)), s((d - x) / (d - c)));
+}
+function cardWanted() {
+  const sel = state.selected;
+  return state.info === 'card' && cardDismissed !== sel && !dataOpen && !hud.hidden && !openSheetEl() && !(PHONE.matches && panel)
+    && view.focus === sel && view.centred() && bodies.views[sel].group.visible;
+}
+// sets where the view is shifted to (shiftTo) and returns how far the card is faded in
+function cardFade() {
+  const on = !!cardPlan && cardWanted(), close = closeDistance(state.selected);
+  const k = on ? cardBand(aimedDistance() / close) : 0;
+  shiftTo.x = -k * (on ? cardPlan.dx : 0);
+  shiftTo.y = baseShift - k * (on ? cardPlan.dy : 0);
+  // (the focus is at the origin; its distance from the camera, not the target's, which a flight moves)
+  return on ? cardBand(camera.position.length() / close) : 0;
+}
+// The card's top left corner (its bubble's, without the tail) relative to the body's centre, for a body
+// drawn `r` px across its close look's frame: beside it at its upper right, level with its top
+// ('side', the tail on the left), the same but higher, its bottom a little below the body's centre
+// ('high': a long description on a phone on its side, between the clock and the time controls), or
+// above it, a little to the right ('above', the tail below). The tail (TAIL) takes most of the gap,
+// its tip stopping short of the body, and points at the body's centre wherever the bubble is.
+const CARD_GAP = TAIL + 7;
+const CARD_KINDS = { side: 0, high: 20, above: 60 };   // what each costs over 'side', in px moved
+function cardOffset(kind, r, w, h) {
+  if (kind === 'above') return [r / 2 - w / 2, -r - CARD_GAP - h];
+  return [r + CARD_GAP, kind === 'side' ? -r : 0.3 * r - h];
+}
+const clampTo = (x, lo, hi) => Math.max(lo, Math.min(x, hi));
+// What the card must keep clear of: the clock's own text and buttons (not the box they lie in, which
+// on phones runs across to the bodies panel), the bodies panel and the two panels at the bottom.
+function cardObstacles() {
+  const out = [], m = 8, range = document.createRange();
+  const add = r => { if (r.width && r.height) out.push({ l: r.left - m, r: r.right + m, t: r.top - m, b: r.bottom + m }); };
+  for (const c of document.querySelector('header.time').children) {
+    if (!c.offsetParent) continue;
+    // the out chip counts even while invisible: a close look always has a view out
+    if (c.tagName === 'BUTTON') add(c.getBoundingClientRect());
+    else { range.selectNodeContents(c); add(range.getBoundingClientRect()); }
+  }
+  for (const el of [$('bodies'), $('info'), document.querySelector('.timectl')]) if (el.offsetParent) add(el.getBoundingClientRect());
+  return out;
+}
+// Where the card goes, worked out for the close look (the body's frame as large as closeSpan, where
+// measureFree centres it): beside the body, or where that leaves no room, above it (phones held
+// upright), at the card's own width or wider, and so shorter (up to 480 px or the screen's width:
+// phones on their side have room across but not up and down), clear of the screen's edges and the
+// panels. The body moves aside on screen by (dx, dy), as little as that takes: the offsets are tried
+// nearest first, in square rings 4 px apart, and the arrangement that moves it least wins, counting
+// CARD_KINDS and 30 px for a wider card than usual. null: no room anywhere.
+// (Pushing the body off each panel in its way in turn missed the narrow gaps a phone on its side
+// leaves, between the clock, the tabs and the panels at the bottom.) Kept until something it
+// depends on changes, as hudBoxes is reset often (the out chip, a tap on the information panel).
+let cardPlan = null, cardPlanKey = '';
+function planCard() {
+  const W = stage.clientWidth, H = stage.clientHeight, g = gapPx();
+  if (!W || !H || hud.hidden) { cardPlanKey = ''; card.setWidth(null); return null; }
+  const r = closeSpan() / 2, cx = W / 2, cy = (free.top + free.bottom) / 2, obst = cardObstacles();
+  const key = [W, H, state.selected, r, cy, document.fonts && document.fonts.status, ...obst.map(o => [o.l, o.t, o.r, o.b].map(Math.round))].join();
+  if (key === cardPlanKey) return cardPlan;
+  cardPlanKey = key;
+  const inside = q => q.l >= g - 0.5 && q.r <= W - g + 0.5 && q.t >= g - 0.5 && q.b <= H - g + 0.5;
+  const hits = (q, o) => q.l < o.r && q.r > o.l && q.t < o.b && q.b > o.t;
+  const widths = [null, ...[360, 420, 480].filter(w => w < W - 2 * g), W - 2 * g].filter(w => !w || w <= 480);
+  const STEP = 4, reach = Math.max(W, H) / 2;
+  let best = null;
+  for (const kind in CARD_KINDS) for (const width of widths) {
+    const penalty = CARD_KINDS[kind] + (width ? 30 : 0);
+    if (best && penalty >= best.cost) continue;
+    const { w, h } = card.measure(width);
+    if (w > W - 2 * g || h > H - 2 * g) continue;
+    // the body's square with its corners cut (a panel may come that near the round body), and the card
+    const k = 0.8 * r, [ox, oy] = cardOffset(kind, r, w, h);
+    const fits = (dx, dy) => {
+      const x = cx + dx, y = cy + dy;
+      // above the body, the card slides along to stay on the screen
+      const l = kind === 'above' ? clampTo(x + ox, g, W - g - w) : x + ox;
+      const rs = [{ l: x - k, r: x + k, t: y - k, b: y + k }, { l, r: l + w, t: y + oy, b: y + oy + h }];
+      return rs.every(q => inside(q) && !obst.some(o => hits(q, o)));
+    };
+    let found = null;
+    for (let n = 0; n * STEP <= Math.min(reach, best ? best.cost - penalty : Infinity) && !found; n++) {
+      for (let i = -n; i <= n; i++) for (const [a, b] of n ? [[i, -n], [i, n], [-n, i], [n, i]] : [[0, 0]]) {
+        const dx = a * STEP, dy = b * STEP, c = Math.hypot(dx, dy);
+        if ((!found || c < found.c) && fits(dx, dy)) found = { dx, dy, c };
+      }
+    }
+    if (!found || (best && found.c + penalty >= best.cost)) continue;
+    // the card's place relative to the body as planned (above, after sliding along), kept from then on
+    const x = cx + found.dx, l = kind === 'above' ? clampTo(x + ox, g, W - g - w) : x + ox;
+    best = { kind, dx: found.dx, dy: found.dy, w, h, r, ox: l - x, oy, width, cost: found.c + penalty };
+  }
+  card.setWidth(best ? best.width : null);
+  return best;
+}
+// Puts the card beside the body as it is drawn now, as if it hung in space beside it: its place and
+// size as planned for the close look, scaled about the body's centre by how much larger or smaller
+// the body is drawn than there (so it neither turns with the view nor slides along the body as the
+// camera comes nearer), and fades it to `alpha`; returns its box for the labels to avoid.
+const _cardP = new THREE.Vector3();
+function placeCard(alpha, W, H) {
+  const v = bodies.views[state.selected], p = _cardP.copy(v.group.position).project(camera);
+  if (!cardPlan || alpha <= 0 || p.z >= 1) { card.set(0, 0, 0); return null; }
+  const x = (p.x * 0.5 + 0.5) * W, y = (-p.y * 0.5 + 0.5) * H;
+  const r = frameExtent(state.selected) / camera.position.distanceTo(v.group.position) * (H / 2) / Math.tan(camera.fov * Math.PI / 360);
+  const { kind, ox, oy } = cardPlan, k = r / cardPlan.r, w = cardPlan.w * k, h = cardPlan.h * k;
+  const l = x + ox * k, t = y + oy * k;
+  card.set(l, t, alpha, kind === 'above' ? 'down' : 'left', x, y, k);
+  return alpha > 0.3 ? { left: l - 4, right: l + w + 4, top: t - 4, bottom: t + h + 4 } : null;
+}
+
 // ---------------------------------------------------------------- picking and hover
 // The body a click, tap or hover at a screen point (client pixels) means: one whose drawn disc (or,
 // if tiny, its dot) is under it, the front one if several; else a label there; else the nearest body
@@ -609,18 +771,19 @@ function updateHover() {
 }
 
 // ---------------------------------------------------------------- HUD
-// The clock shows local time, UTC, or UTC with the astronomical time scales ("scientific").
-// The model takes UTC to be UT1 (they never differ by more than 0.9 s).
-const TIME_MODES = ['Local', 'UTC', 'Scientific'];
+// The clock shows local time, or UT with the astronomical time scales ("scientific"). The model
+// takes UTC to be UT1 (they never differ by more than 0.9 s). A third mode, UTC alone, was dropped as
+// Scientific shows the same time; its choice is kept as Scientific.
+const TIME_MODES = ['Local', 'Scientific'];
 let timeMode = 'Local';
-try { const m = localStorage.getItem('solarSystem.timeMode'); if (TIME_MODES.includes(m)) timeMode = m; } catch {}
+try { const m = localStorage.getItem('solarSystem.timeMode'); if (TIME_MODES.includes(m)) timeMode = m; else if (m === 'UTC') timeMode = 'Scientific'; } catch {}
 function setTimeMode(m) {
   timeMode = m;
   try { localStorage.setItem('solarSystem.timeMode', m); } catch {}
   $('timeMode').textContent = m;
   $('timeDetails').hidden = m !== 'Scientific';
   // the date field is typed in the same time as the clock shows
-  $('when').setAttribute('aria-label', m === 'Local' ? 'Date and time (local)' : 'Date and time (UTC)');
+  $('when').setAttribute('aria-label', m === 'Local' ? 'Date and time (local)' : 'Date and time (UT)');
   // and so are the times in the events list
   if (!$('events').hidden) rebuildEvents();
   hudBoxes = null; hudDirty = true; wake();
@@ -633,9 +796,7 @@ function updateHud() {
   timeEls.date.textContent = fmtDate(d, utc);
   const julian = civil(d, utc).julian ? 'Julian calendar' : '';
   // Scientific shows UT (UT1), which the model takes UTC to be; the two differ by under 0.9 s
-  timeEls.tz.textContent = [timeMode === 'Local' ? tzName(d) : timeMode === 'Scientific' ? 'UT' : '', julian].filter(Boolean).join(' · ');
-  // empty (UTC in the Gregorian calendar), it would still take a gap in the row
-  timeEls.tz.hidden = !timeEls.tz.textContent;
+  timeEls.tz.textContent = [timeMode === 'Local' ? tzName(d) : 'UT', julian].filter(Boolean).join(' · ');
   // nothing to say while inside the validated range
   timeEls.badge.hidden = state.simMs >= VALID_FROM && state.simMs < VALID_TO;
   if (timeMode === 'Scientific' && snap) {
@@ -733,8 +894,8 @@ function setPanel(v, remember = false) {
 }
 // The settings are padded at the bottom to at least the height of the list (its planets alone), so
 // that opening them does not pull the panel's lower edge up; moons opened in the list still lengthen
-// it. The list itself is never padded: where the settings are the taller (they are now, with ten
-// switches), empty space under Pluto would look like a missing entry, so the panel grows instead.
+// it. The list itself is never padded: where the settings are the taller (they are now, with nine
+// switches and Body info), empty space under Pluto would look like a missing entry, so the panel grows instead.
 // scrollHeight is the content's height even where the panel squeezes them (phones).
 function evenPanes() {
   const el = $('bodies'), list = $('bodyList'), set = $('settings'), shown = [list.hidden, set.hidden];
@@ -777,11 +938,11 @@ try { const k = JSON.parse(localStorage.getItem('solarSystem.evKinds')); if (Arr
 // gen: which list the replies belong to (a new one starts when the list is rebuilt); busy: a step
 // is being searched; anchor: the instant to bring to the top once the first rows arrive
 const ev = { gen: 0, at: 0, anchor: null, busy: false, atStart: true, atEnd: true, on: false, queued: false };
-// Times are given as the clock shows them, in local time or UTC (UT in Scientific), and the rows
+// Times are given as the clock shows them, in local time or UT (Scientific), and the rows
 // are grouped by the year in that time (local time can put an event in the next or previous year)
 const evUtc = () => timeMode !== 'Local';
 const evYear = t => civil(new Date(t), evUtc()).y;
-const evZone = d => timeMode === 'Local' ? tzName(d) : timeMode === 'Scientific' ? 'UT' : 'UTC';
+const evZone = d => timeMode === 'Local' ? tzName(d) : 'UT';
 const evWhen = (d, sep) => fmtDate(d, evUtc()) + sep + fmtTime(d, evUtc(), false) + ' ' + evZone(d);
 
 // the worker (started on first use), or if it cannot start, the same searches on the page
@@ -1014,7 +1175,7 @@ function placeSheet() {
     // the out chip keeps its place when invisible, so the clock's bottom is that of its last shown part
     const shown = [...time.children].filter(c => c.offsetParent && !c.classList.contains('off'));
     top = Math.max(box(shown.at(-1) ?? time).b, box($('right')).b) + gap;
-    bottom = Math.min(bottom, box($('info')).t - gap);
+    if ($('info').offsetParent) bottom = Math.min(bottom, box($('info')).t - gap);
   }
   const w = Math.min(s.offsetWidth, right - left), h = Math.min(natH, bottom - top);
   if (right - left < minW || h < 320) return false;
@@ -1054,6 +1215,8 @@ function paintToggles() {
     const on = k === 'lock' ? view.lock : state.show[k];
     b.setAttribute('aria-checked', on);
   }
+  for (const b of document.querySelectorAll('[data-info]')) b.setAttribute('aria-checked', b.dataset.info === state.info);
+  paintInfo();
   saveSettings();
 }
 // The settings survive a reload: the switches, Lock, the scale and Night sides. Saved only once startup is
@@ -1063,7 +1226,7 @@ const SETTINGS_KEY = 'solarSystem.settings';
 let settingsRestored = false;
 function saveSettings() {
   if (!settingsRestored) return;
-  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ show: state.show, lock: view.lock, scale: state.scaleTarget, night: state.nightLight })); } catch {}
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ show: state.show, info: state.info, lock: view.lock, scale: state.scaleTarget, night: state.nightLight })); } catch {}
 }
 function restoreSettings() {
   try {
@@ -1071,6 +1234,9 @@ function restoreSettings() {
     if (v && typeof v === 'object') {
       // only switches that still exist, so a renamed or removed one falls back to its default
       if (v.show) for (const k of Object.keys(state.show)) if (typeof v.show[k] === 'boolean') state.show[k] = v.show[k];
+      // (the Info card switch that came before Body info, off: the panel)
+      if (['card', 'panel', 'none'].includes(v.info)) state.info = v.info;
+      else if (v.show && v.show.cards === false) state.info = 'panel';
       if (typeof v.lock === 'boolean') view.lock = v.lock;
       if (Number.isFinite(v.scale)) setScale(v.scale, false);
       if (Number.isFinite(v.night)) setNightLight(v.night);
@@ -1085,10 +1251,10 @@ function wire() {
   // iOS Safari zooms the page on a pinch even where touch-action forbids it; its own gesture events
   // (not the pointer events the 3D view uses) can still be cancelled
   for (const ev of ['gesturestart', 'gesturechange']) document.addEventListener(ev, e => e.preventDefault(), { passive: false });
-  // Labels lie over the 3D view: the wheel and a trackpad pinch there zoom the view, as they do
+  // Labels and the info card lie over the 3D view: the wheel and a trackpad pinch there zoom the view, as they do
   // next to them. Elsewhere (the panels) a pinch, which arrives as a wheel event with Ctrl held,
   // must not zoom the page; a plain wheel still scrolls lists and sheets.
-  $('labels').addEventListener('wheel', e => {
+  for (const el of [$('labels'), $('card')]) el.addEventListener('wheel', e => {
     e.preventDefault(); e.stopPropagation();
     renderer.domElement.dispatchEvent(new WheelEvent('wheel', e));
   }, { passive: false });
@@ -1105,7 +1271,8 @@ function wire() {
   THREE.DefaultLoadingManager.onProgress = () => wake();
   bodies.onChange = () => wake();
   stars.ready.then(() => wake());
-  document.fonts && document.fonts.ready.then(() => { labels.remeasure(); wake(); });
+  // (and the card's size, which planCard measures)
+  document.fonts && document.fonts.ready.then(() => { labels.remeasure(); hudBoxes = null; wake(); });
 
   for (const b of document.querySelectorAll('[data-toggle]')) b.addEventListener('click', () => {
     const k = b.dataset.toggle;
@@ -1113,6 +1280,11 @@ function wire() {
     if (k === 'lock') { view.lock = !view.lock; if (view.lock) view.glide(); }
     else state.show[k] = !state.show[k];
     if (k === 'moons') paintList();
+    paintToggles();
+  });
+  // Body info: a change starts afresh, the panel folded (or not shown)
+  for (const b of document.querySelectorAll('[data-info]')) b.addEventListener('click', () => {
+    state.info = b.dataset.info; dataOpen = false; info.setMin(true);
     paintToggles();
   });
   $('scale').addEventListener('input', e => setScale(1 - e.target.value, false));
@@ -1134,7 +1306,7 @@ function wire() {
   const when = $('when'), whenForm = $('whenForm'), whenBtn = $('whenBtn');
   const touch = () => matchMedia('(pointer: coarse)').matches;
   const setWhenOpen = on => { whenOpen = on; whenForm.classList.toggle('open', on); whenBtn.setAttribute('aria-expanded', on); if (!on) hudDirty = true; };
-  // in the clock's time (local or UTC), Julian calendar before 1582
+  // in the clock's time (local or UT), Julian calendar before 1582
   const goToWhen = () => {
     const t = parseLocalInput(when.value, timeMode !== 'Local');
     if (Number.isNaN(t) || t < MIN_MS || t > MAX_MS) { toast('Choose a date between the years 1000 and 2999.'); return false; }
@@ -1263,7 +1435,16 @@ function wire() {
 const MIN_PANE = 160;
 const gapPx = () => parseFloat(getComputedStyle($('app')).getPropertyValue('--gap')) || 20;
 function layoutPanels() {
-  const app = $('app'), gap = gapPx(), infoEl = $('info'), right = $('right').getBoundingClientRect();
+  const app = $('app'), gap = gapPx(), infoEl = $('info');
+  // The time controls: in the middle of the bottom edge, or only as far right of it as clears the
+  // information panel when that is shown beside them (with Body info on Panel, or opened by the
+  // card's More data, on screens narrower than about 1,430 px). On phones held upright and upright
+  // tablets they span the width under the panel and --ctl-left goes unused (style.css).
+  const ctl = document.querySelector('.timectl'), cr = ctl.getBoundingClientRect(), ir = infoEl.getBoundingClientRect();
+  let left = (app.clientWidth - cr.width) / 2;
+  if (ir.width && ir.bottom > cr.top) left = Math.max(left, ir.right + gap);
+  app.style.setProperty('--ctl-left', Math.round(Math.min(left, app.clientWidth - cr.width - gap)) + 'px');
+  const right = $('right').getBoundingClientRect();
   const over = (a, b) => a.height && b.height && a.right > b.left && a.left < b.right;
   let info = infoEl.getBoundingClientRect(), top = 0;
   const time = document.querySelector('header.time').getBoundingClientRect();
@@ -1322,4 +1503,4 @@ function look(name, dir = 'sun', k = 5) {
   if (dir === 'sun') d.add(new THREE.Vector3(0, 0.35, 0)).normalize();
   view.setFocus(name, disp, { dist: drawnRadius(name) * k, dir: d });
 }
-window.solarSystem = { look, state, view, scale, bodies, orbits, glare, renderer, snapshotAt: ms => snapshot(ms), setTime, setScale, select, presets, outStep, goOut, jumpToEvent, EventTimeline, openEvents };
+window.solarSystem = { look, state, view, scale, bodies, orbits, glare, renderer, snapshotAt: ms => snapshot(ms), setTime, setScale, select, presets, outStep, goOut, jumpToEvent, EventTimeline, openEvents, planCard, card };

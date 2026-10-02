@@ -28,10 +28,20 @@
 <div id="app">
   <div id="stage" aria-label="3D view of the Solar System. Drag to turn the view, scroll or pinch to zoom." role="img"></div>
   <div id="labels"><div class="hover-ring" id="hoverRing"></div></div>
+  <!-- the info card: the selected body's description in a speech bubble, beside it in a close look
+       (card.js draws the outline with its tail; main.js places it and fades it in and out) -->
+  <aside class="card off" id="card" aria-label="About the Sun">
+    <svg class="card-shape" aria-hidden="true"><path/></svg>
+    <div class="card-body">
+      <div class="card-head"><div><div class="card-type"></div><div class="card-name"></div></div><button type="button" class="card-close" aria-label="Close the card"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
+      <p class="card-desc"></p>
+      <button type="button" class="card-more">More data</button>
+    </div>
+  </aside>
 
   <header class="time" data-hud>
     <div class="time-head">
-      <button type="button" class="chip mode" id="timeMode" title="Switch the clock between local time, UTC and scientific time scales">Local</button>
+      <button type="button" class="chip mode" id="timeMode" title="Switch the clock between local time and scientific time scales">Local</button>
       <span class="kicker" id="tzLabel"></span>
       <button type="button" class="chip icon-chip" id="hideBtn" aria-label="Hide the interface"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8S4 3.6 8 3.6 14.5 8 14.5 8 12 12.4 8 12.4 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/><path d="M2.6 13.4 13.4 2.6"/></svg></button>
       <button type="button" class="chip warn" id="badge" hidden title="Outside 1800–2050 the positions are extrapolated. Click for details.">Extrapolated</button>
@@ -79,8 +89,13 @@
         <button type="button" class="check" role="checkbox" data-toggle="glare" aria-checked="true">Sun glare<i></i></button>
         <button type="button" class="check" role="checkbox" data-toggle="cities" aria-checked="true">Cities<i></i></button>
         <button type="button" class="check" role="checkbox" data-toggle="lock" aria-checked="true">Lock<i></i></button>
+        <!-- how a body is described: by the info card beside it up close, the information panel in the
+             corner, or neither. Three choices, not a scale, so three buttons with the chosen one lit
+             (a slider here would read as more or less of something, as the two below do) -->
+        <h2 class="slider-title first" id="infoTitle">Body info</h2>
+        <div class="seg" role="radiogroup" aria-labelledby="infoTitle"><button type="button" role="radio" data-info="card">Card</button><button type="button" role="radio" data-info="panel">Panel</button><button type="button" role="radio" data-info="none">None</button></div>
         <!-- the sliders: reality at the left end of each, a clearer but less real view to the right -->
-        <h2 class="slider-title first" id="scaleTitle">Scale</h2>
+        <h2 class="slider-title" id="scaleTitle">Scale</h2>
         <!-- real scale on the left, the overview on the right (the input's value is 1 − scale) -->
         <input type="range" id="scale" min="0" max="1" step="0.001" value="0" aria-labelledby="scaleTitle">
         <div class="slider-ends"><button type="button" id="scaleMax">Real</button><button type="button" id="scaleMin">Overview</button></div>
@@ -155,11 +170,11 @@
     <h3>Getting around</h3>
     <ul class="basics">
       <li><b>Look around.</b> Drag to turn the view; scroll or pinch to zoom; right-drag or drag with two fingers to move it sideways.</li>
-      <li><b>Visit a body.</b> Click it, its label or its name in the <b>Bodies</b> list, and the camera glides over. Choose it again to fly in: a planet first shows its moons and the Sun the inner planets, then the next choice comes in close. The button under the date (or <kbd>Backspace</kbd>) zooms back out one step at a time; scroll or pinch to zoom freely, or press <kbd>Esc</kbd> for the whole system. If you have moved the view sideways, choosing it again first brings it back to the centre. The arrow beside a planet lists its moons; choosing the <b>Bodies</b> tab again folds the list away. On phones the tabs show only their icons: a ringed planet for Bodies, a gear for Settings and an open book for the Guide.</li>
+      <li><b>Visit a body.</b> Click it, its label or its name in the <b>Bodies</b> list, and the camera glides over. Choose it again to fly in: a planet first shows its moons and the Sun the inner planets, then the next choice comes in close, where a card beside it tells you about it. The button under the date (or <kbd>Backspace</kbd>) zooms back out one step at a time; scroll or pinch to zoom freely, or press <kbd>Esc</kbd> for the whole system. If you have moved the view sideways, choosing it again first brings it back to the centre. The arrow beside a planet lists its moons; choosing the <b>Bodies</b> tab again folds the list away. On phones the tabs show only their icons: a ringed planet for Bodies, a gear for Settings and an open book for the Guide.</li>
       <li><b>Run time.</b> The round button plays and pauses time. The speed slider beside it runs from real time on the left to years per second on the right, and the clock with the circular arrow runs time backward.</li>
       <li><b>Jump in time.</b> The calendar button goes to any date from 1000 to 2999, and <b>Now</b> comes back to the present.</li>
       <li><b>Eclipses and transits</b>, the button between the calendar and Now, lists past and coming events. Choose one to watch it.</li>
-      <li><b>Settings</b>, the tab beside Bodies, turn orbits, labels, moons, the spin axis, the stars, the Milky Way, the Sun’s glare and Earth’s city lights on and off, and set <b>Lock</b>. Below them, two sliders have reality at their left end: <b>Scale</b> runs from the real scale to an overview, and <b>Night sides</b> from real, dark night sides to lit ones. All are kept for your next visit.</li>
+      <li><b>Settings</b>, the tab beside Bodies, turn orbits, labels, moons, the spin axis, the stars, the Milky Way, the Sun’s glare and Earth’s city lights on and off, and set <b>Lock</b>. <b>Body info</b> chooses how a body is described: by a <b>Card</b> beside it when you are close, by the information <b>Panel</b> in the corner, or not at all (<b>None</b>). Below them, two sliders have reality at their left end: <b>Scale</b> runs from the real scale to an overview, and <b>Night sides</b> from real, dark night sides to lit ones. All are kept for your next visit.</li>
       <li><b>Hide the interface</b> with the eye beside the clock’s time zone to see only the sky; click or tap empty space to bring it back. Turning, zooming and choosing bodies keep working meanwhile.</li>
     </ul>
     <dl class="keys">
@@ -180,10 +195,11 @@
         <li>The camera glides to a body without changing your zoom or viewing angle (it only backs off if it would end up inside the body). Flying in close keeps your viewing angle too; if you are looking at the night side, the Night sides setting can light it.</li>
         <li><b>Lock</b> (in the settings) keeps the camera travelling with the selected body. Unlock it to let the body drift away, and lock again to catch up with it. Right-drag, shift-drag, the arrow keys or a two-finger drag move the view sideways; locked, the camera keeps following the body from there.</li>
         <li>The speed slider runs from real time (1×) at its left end to about five years per second at its right. Up to 60× the speed is shown as a multiple of real time, faster as simulated time per second (“5 min/s”, “2 d/s”, “1 yr/s”). <b>Play</b> and <b>Pause</b> keep the chosen speed: paused, it is shown dimmed. Running backward keeps the speed too, and marks it with a −.</li>
-        <li>The calendar takes dates in the time the clock shows (local or UTC). On a phone it opens the phone’s own date picker; on a computer type or pick a date and press <b>Set</b> (or <kbd>Enter</kbd>).</li>
-        <li>The button above the clock switches between <b>Local</b> time, <b>UTC</b> and <b>Scientific</b>, which shows Universal Time (UT, Earth’s rotation, UT1) and adds TT (the uniform time the planets move by), ΔT = TT − UT and the Julian Date. The model takes UTC to be UT1; the two never differ by more than 0.9 s.</li>
+        <li>The calendar takes dates in the time the clock shows (local or UT). On a phone it opens the phone’s own date picker; on a computer type or pick a date and press <b>Set</b> (or <kbd>Enter</kbd>).</li>
+        <li>The button above the clock switches between <b>Local</b> time and <b>Scientific</b>, which shows Universal Time (UT, Earth’s rotation, UT1) and adds TT (the uniform time the planets move by), ΔT = TT − UT and the Julian Date. The model takes UTC to be UT1; the two never differ by more than 0.9 s.</li>
         <li><b>Night sides</b> (in the settings) adds a light from where you are looking, so night sides and the dark of an eclipse show their surface; the further right, the brighter. It is not real light: the shadows themselves stay exactly where they are. At <b>Real</b>, night sides are black as a camera exposed for daylight sees them; your eye, adapted to the dark, would see the Moon’s dark side faintly lit by Earth (earthshine). <b>Sun glare</b> turns off the glare around the Sun, which helps to see what lies close to it, such as a planet crossing the Sun’s disc.</li>
-        <li>The information panel starts folded down to the body’s name: tap it (or <b>+</b>) to open it, and <b>–</b> folds it again. On a phone or an upright tablet, tap an open panel to show all of its data.</li>
+        <li>Up close, a card beside the body describes it. It hangs beside the body, growing and shrinking with it as you zoom, and fades away as you zoom out (or far in), and the view moves aside to make room for it where the screen is small. <b>×</b> closes it until you choose a body again. Its <b>More data</b> opens the information panel with the body’s figures, and the panel’s <b>–</b> goes back to the card.</li>
+        <li>Choose <b>Panel</b> under Body info in the settings to have the information panel instead, always there in the corner: it starts folded down to the body’s name; tap it (or <b>+</b>) to open it, and <b>–</b> folds it again. On a phone or an upright tablet, tap an open panel to show all of its data.</li>
       </ul>
     </details>
 

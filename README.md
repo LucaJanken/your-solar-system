@@ -45,14 +45,18 @@ GitHub Pages serves the repository as-is.
   get the phones' finger-sized rows and buttons, and screens from 1680 × 1000 px a size larger
   type, panels and margins. The folded information panel is as tall as the time controls beside it.
 - The settings are tick boxes: Orbits, Labels, Moons, Spin axis, Stars, Milky Way, Sun glare,
-  Cities (Earth's night lights) and Lock, then two sliders with reality at their left end, labelled
+  Cities (Earth's night lights) and Lock, then Body info, a row of three buttons (Card, Panel or
+  None: a choice, not a scale, so not a slider), then two sliders with reality at their left end, labelled
   Real: Scale (real scale to the overview, Overview) and Night sides (black, as the Sun alone
   leaves them, to Lit: a light from the viewer that shows night sides and eclipse shadows, not
   physical, and leaving the shadows themselves unchanged). The ends' labels set the slider there.
   All are kept across reloads (`localStorage`); a scale in the URL hash overrides the saved one.
   On phones a label has about 83 px beside its box (12 px type, the Bodies list's), about nine
   letters: check a new label's width before adding it.
-- The bottom bar: a round Play/Pause button, a reverse button (a clock with a circular arrow, lit
+- The time controls lie in the middle of the bottom edge, under the body in the centre, moved only
+  as far right as clears the information panel when that is shown beside them (Panel, or the card's
+  More data, on screens narrower than about 1,430 px); on phones and upright tablets they span the
+  width. They hold a round Play/Pause button, a reverse button (a clock with a circular arrow, lit
   while time runs backward; `R`), the speed slider, the calendar, Eclipses & transits and Now. The
   slider is logarithmic and forward-only, from real time on the left to about 5 years per second on
   the right; `[` `]` move it a step. A caption above it reads SPEED and the value: a multiple of
@@ -68,9 +72,9 @@ GitHub Pages serves the repository as-is.
 - Eclipses & transits lists solar and lunar eclipses and transits of Mercury and Venus, opening at
   the displayed date and loading more as it is scrolled either way (searched in a worker). The kinds
   shown can be switched off and on (remembered); choosing an event goes there. Times are given as
-  the clock shows them (local time, UTC, or UT in Scientific).
-- The clock shows Local time, UTC, or Scientific (UT, with TT, ΔT and the Julian Date); the
-  choice is remembered. An Extrapolated tag appears outside the validated 1800–2050.
+  the clock shows them (local time, or UT in Scientific).
+- The clock shows Local time or Scientific (UT, with TT, ΔT and the Julian Date); the
+  choice is remembered (a former choice of UTC, a mode since dropped, as Scientific). An Extrapolated tag appears outside the validated 1800–2050.
 - The camera steps between a few views of the body it is centred on: its close look (a comfortable
   view of it); the inner planets for the Sun, or its moons for a planet with moons; and the whole
   system. Selecting an outer planet or the Sun glides the camera over to it without turning the
@@ -113,6 +117,23 @@ GitHub Pages serves the repository as-is.
   folded, on phones; the time controls elsewhere) and then scrolls; the information panel never
   comes closer to the panels above it, and scrolls inside instead. Where they meet on phones the
   information panel keeps its height and the bodies panel keeps at least its first few rows.
+- Body info in the settings (Card by default) chooses how a body is described: by the info card,
+  by the information panel above, or neither (None: no card, no panel). With the card, the panel
+  is not shown; in a close look at the
+  selected body a speech bubble beside it, at its upper right (or higher up beside it, or above it,
+  where there is no room), its tail pointing at the body, gives its name, kind and description. It
+  hangs beside the body as if in space: placed and sized for the close look, it grows and shrinks
+  with the body as the camera comes nearer or goes farther, scaled about the body's centre, but
+  stays upright and facing the viewer. It shows from 0.75 to 1.35 times the close look's distance,
+  fading out toward 0.55 and 2 (so its text stays between about half and twice its size), by the
+  camera's distance as it is, so it fades in the same way during a flight as during a zoom by hand.
+  The view moves aside (a view offset, already on the way there) as
+  little as it takes for the body and the card to clear the screen's edges and the panels; with no
+  room anywhere there is no card. × closes it until a body is chosen again (the same one too). More
+  data opens the information panel, as it looks without the card, and its – button closes it again,
+  back to the card. The card also stays away while a sheet is open, while the bodies panel is open
+  on phones and with the interface hidden. The selected body's label gives way to it, and other
+  labels keep clear of it.
 - A view given in the URL hash (`#t=…&focus=…&sel=…&scale=…&speed=…&dir=-1&play=0&cam=…`), as
   links from the former Share view carry it, is still read on load; `dir=-1` turns on reverse. The
   page no longer writes one.
@@ -147,7 +168,7 @@ js/scene/       three.js rendering
   stars.js        Yale Bright Star Catalogue with proper motion, over the Milky Way
   view.js         camera, floating origin, focus glides, lock
   labels.js       labels
-js/ui/          info.js: information panel; hud.js: hiding the interface, telling taps from
+js/ui/          info.js: information panel; card.js: info card; hud.js: hiding the interface, telling taps from
                 drags; format.js: numbers, dates and the speed readout
 js/main.js      state, main loop, controls
 vendor/         three.js r186 (+ OrbitControls) and astronomy-engine 2.1.19, minified ES modules
