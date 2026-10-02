@@ -105,34 +105,37 @@ function orbitMapping(name) {
 const drawnRadius = (name, sc = scale) => sc.size(meanRadius(BY_NAME[name]));
 // The view of the whole system: Neptune's orbit, with a margin, fits the part of the screen the panels
 // leave free (clear of the side panel on computers), seen from SYSTEM_ELEV above the ecliptic.
+// With `folded`, this view, the inner planets' and the moons' are framed as if the bodies list were
+// folded (see outStep).
 const SYSTEM_ELEV = 0.30;
 const SYSTEM_DIR = new THREE.Vector3(0, Math.sin(SYSTEM_ELEV), -Math.cos(SYSTEM_ELEV));
-const systemDistance = (sc = scale) => frameDistance(1.08 * sc.helio(30.1 * AU_KM));
+const systemDistance = (sc = scale, folded = false) => frameDistance(1.08 * sc.helio(30.1 * AU_KM), folded);
 // The view of the inner planets: Mars's orbit, out to its aphelion (1.666 AU), framed alike. For the
 // Sun, and for the inner planets and their moons (only on the way out), around them: the frame then
 // reaches as much farther as the planet is drawn from the Sun, so Mars's orbit still fits. 0 for
 // the other bodies.
 const INNER = new Set(['Mercury', 'Venus', 'Earth', 'Mars']);
-function innerDistance(name, sc = scale) {
+function innerDistance(name, sc = scale, folded = false) {
   const def = BY_NAME[name], p = name === 'Sun' || def.parent === 'Sun' ? name : def.parent;
   if (p !== 'Sun' && !INNER.has(p)) return 0;
-  return frameDistance(1.08 * sc.helio(1.666 * AU_KM) + (p === 'Sun' ? 0 : sc.helio(Math.hypot(...snap.bodies[p].pos))));
+  return frameDistance(1.08 * sc.helio(1.666 * AU_KM) + (p === 'Sun' ? 0 : sc.helio(Math.hypot(...snap.bodies[p].pos))), folded);
 }
 // the tangents of the half-angles across and up that the part of the screen the panels leave free
-// spans around the focus (which is in the middle of it)
-function freeTans() {
+// spans around the focus (which is in the middle of it); with `folded`, as if the bodies list were
+// folded
+function freeTans(folded = false) {
   const W = stage.clientWidth || 1, H = stage.clientHeight || 1;
   // the open bodies list is in the way (on computers), the toolbar it folds to, across the top
   // corner, is not. (Judged at 40% of the height, the planets' list alone ended just short of it and
   // with a planet's moons listed just past it, so this view changed by a quarter with the selection.)
   const col = $('bodies').getBoundingClientRect();
-  const right = !hud.hidden && col.bottom > H * 0.25 ? col.left - 12 : W;
+  const right = !folded && !hud.hidden && col.bottom > H * 0.25 ? col.left - 12 : W;
   const tanV = Math.tan(DEFAULT_FOV * Math.PI / 360);
   return { x: tanV * Math.max(40, Math.min(W / 2, right - W / 2)) / (H / 2), y: tanV * Math.min(H, free.bottom - free.top) / H };
 }
 // the camera distance that frames a circle of drawn radius R in the ecliptic, as above
-function frameDistance(R) {
-  const tan = freeTans();
+function frameDistance(R, folded = false) {
+  const tan = freeTans(folded);
   // the near side of the orbit is the farthest up or down the screen
   return Math.max(R / tan.x, R * Math.cos(SYSTEM_ELEV) + R * Math.sin(SYSTEM_ELEV) / tan.y);
 }
@@ -274,15 +277,15 @@ const aimedDistance = () => view.tween ? view.tween.toDist : view.distance() * M
 // Sun its inner planets and for a planet its moons, then the whole system. With `out` (the way back
 // out), also for a moon its planet's moons, around it, so that out from a moon's close look shows
 // where it is (choosing a moon goes straight to its close look), and for the inner planets and
-// their moons the inner planets. Kept in increasing order.
-function presets(name, out = false, sc = scale) {
+// their moons the inner planets. Kept in increasing order. `folded` as for systemDistance.
+function presets(name, out = false, sc = scale, folded = false) {
   const list = [['close', closeDistance(name, sc)]];
-  if (name === 'Sun') list.push(['inner', innerDistance(name, sc)]);
+  if (name === 'Sun') list.push(['inner', innerDistance(name, sc, folded)]);
   else {
-    if (out || BY_NAME[name].parent === 'Sun') { const m = moonsDistance(name, sc); if (m) list.push(['moons', m]); }
-    if (out) { const i = innerDistance(name, sc); if (i) list.push(['inner', i]); }
+    if (out || BY_NAME[name].parent === 'Sun') { const m = moonsDistance(name, sc, folded); if (m) list.push(['moons', m]); }
+    if (out) { const i = innerDistance(name, sc, folded); if (i) list.push(['inner', i]); }
   }
-  list.push(['system', systemDistance(sc)]);
+  list.push(['system', systemDistance(sc, folded)]);
   return list.filter((p, i) => i === 0 || i === list.length - 1 || (p[1] > list[i - 1][1] && p[1] < list[list.length - 1][1]));
 }
 // How near the camera must be for moving on from a body to go to the next one's entry view (the last
@@ -291,11 +294,15 @@ function presets(name, out = false, sc = scale) {
 const reachDistance = name => { const p = presets(name, true); return p[p.length - 2][1]; };
 // One step out: the nearest preset farther than the camera is aiming (its close look skipped, zoomed
 // in nearer than it), the last being the whole system, still around the same body; null from there
-// on out.
+// on out. Which one is judged by the views framed as if the bodies list were folded, the nearest
+// they are framed (opening it frames the wider views up to a third farther out, so that they keep
+// clear of it): judged by the views as framed now, opening the list or the settings over a view
+// framed with it folded made the chip offer the same view again. It leads to the view as framed now.
 const OUT_LABELS = { moons: 'Moons', inner: 'Inner planets', system: 'Whole system' };
 function outStep() {
   const d = aimedDistance();
-  return presets(view.focus, true).find(p => p[0] !== 'close' && p[1] > d * 1.1) || null;
+  const step = presets(view.focus, true, scale, true).find(p => p[0] !== 'close' && p[1] > d * 1.1);
+  return step ? presets(view.focus, true).find(p => p[0] === step[0]) || step : null;
 }
 function goOut() {
   const step = outStep();
@@ -331,16 +338,16 @@ function paintOut() {
 // sideways, the orbits, mostly seen aslant, came out a sixth of the width). At least four close
 // looks of the planet. The moons preset, and an anchor of mapDistance so that it keeps through a
 // change of scale.
-function moonsDistance(name, sc = scale) {
+function moonsDistance(name, sc = scale, folded = false) {
   const def = BY_NAME[name];
   if (name === 'Sun') return 0;
-  if (def.parent !== 'Sun') return moonsDistance(def.parent, sc);
+  if (def.parent !== 'Sun') return moonsDistance(def.parent, sc, folded);
   // drawn distance of a moon from its planet, as computeDisplay places it
   const span = m => { const p = BY_NAME[m].parent; return sc.moon(m, p, meanRadius(BY_NAME[p]), Math.hypot(...snap.bodies[m].rel.pos)); };
   let r = 0;
   for (const m of BODIES) if (m.parent === name) r = Math.max(r, span(m.name));
   if (!r) return 0;
-  const tan = Math.min(freeTans().x, Math.tan(DEFAULT_FOV * Math.PI / 360));
+  const tan = Math.min(freeTans(folded).x, Math.tan(DEFAULT_FOV * Math.PI / 360));
   return Math.max(r / Math.sin(Math.atan(0.85 * tan)), closeDistance(name, sc) * 4);
 }
 
