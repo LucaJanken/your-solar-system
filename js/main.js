@@ -75,7 +75,8 @@ const info = new InfoPanel();
 // The info card and the information panel are the two ways to read about a body, chosen under Body
 // info in the settings (state.info), which can also have neither. With the card, the panel is not
 // shown until a click on the card (its More data) opens it (as it looks on its own), and its – button then closes
-// it, back to the card (dataOpen). Closed, the card stays away until a body is chosen (again).
+// it, back to the card (dataOpen), as does choosing another body. Closed, the card stays away until a
+// body is chosen (again).
 let cardDismissed = null, dataOpen = false;
 const card = new InfoCard($('card'), {
   onClose: () => { cardDismissed = state.selected; wake(); },
@@ -260,6 +261,8 @@ function applyShift(dt) {
 // give one view to go out to at every distance.)
 function select(name, fly) {
   wake();
+  // with the card, a new body closes the panel opened from the previous one's card (back to the card)
+  if (name !== state.selected && state.info === 'card' && dataOpen) { dataOpen = false; info.setMin(true); paintInfo(); }
   state.selected = name;
   openSystemOf(name);
   info.show(name);

@@ -135,7 +135,7 @@ GitHub Pages serves the repository as-is.
   little as it takes for the body and the card to clear the screen's edges and the panels; with no
   room anywhere there is no card. × closes it until a body is chosen again (the same one too). A
   click anywhere else on it (its More data names this) opens the information panel, as it looks without the card, and its – button closes it again,
-  back to the card. The card also stays away while a sheet is open, while the bodies panel is open
+  back to the card, as does choosing another body. The card also stays away while a sheet is open, while the bodies panel is open
   on phones and with the interface hidden. The selected body's label gives way to it, and other
   labels keep clear of it.
 - A view given in the URL hash (`#t=…&focus=…&sel=…&scale=…&speed=…&dir=-1&play=0&cam=…`), as
