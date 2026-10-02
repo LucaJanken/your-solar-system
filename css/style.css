@@ -186,6 +186,8 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
 .facts { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line); display: grid; grid-template-columns: minmax(84px, min(34%, 150px)) 1fr; gap: 5px 14px; font: 400 12px/1.35 var(--mono); }
 .facts dt { color: var(--text-3); } .facts sup { font-size: 0.72em; line-height: 0; } .facts dd { margin: 0; color: rgb(var(--ink-rgb) / 0.92); font-variant-numeric: tabular-nums; }
 .info details { margin-top: 10px; font: 400 12px/1.35 var(--mono); }
+.info summary::after { content: 'More data'; }
+.info details[open] summary::after { content: 'Less data'; }
 .info summary { cursor: pointer; color: var(--text-3); font: 500 12px/1.35 var(--serif); letter-spacing: 0.12em; text-transform: uppercase; }
 .info .note { margin-top: 8px; font: 400 13.5px/1.4 var(--serif); color: var(--text-3); }
 
@@ -421,13 +423,14 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
   .info .info-desc { font-size: 15px; }
   .facts, .info details { font-size: 11px; }
   /* compact: the description and the main figures; tapping adds the rest */
+  .info summary { display: none; }
   .info:not(.expanded) details, .info:not(.expanded) .facts .x { display: none; }
   /* the guide and the list of events as wide as the panels at the bottom (placeSheet in main.js
      sets only their height and how far down they are) */
   .sheet, #guide { left: var(--gl); right: var(--gr); width: auto; transform: translateY(-50%); }
   /* say that the compact panel opens up */
-  .info-body::after { content: 'Tap for more'; display: block; margin-top: 9px; font: 500 11px/1 var(--serif); letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); }
-  .info.expanded .info-body::after { content: 'Tap for less'; }
+  .info-body::after { content: 'More data'; display: block; margin-top: 9px; font: 500 11px/1 var(--serif); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); }
+  .info.expanded .info-body::after { content: 'Less data'; }
 }
 @media (max-width: 359px) { .clock { font-size: 24px; } }
 /* most phones: the value alone (SPEED and the longest value, "−1.8 min/s", need 122 px, which only

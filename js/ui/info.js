@@ -46,7 +46,12 @@ export class InfoPanel {
       if (e.target.closest('summary')) return;
       if (e.target.closest('#infoMin')) this.setMin(!this.min);
       else if (this.min) this.setMin(false);
-      else this.el.classList.toggle('expanded');
+      else {
+        const on = this.el.classList.toggle('expanded');
+        // on phones the expanded panel is the one tap: it shows the extra data too, with no
+        // separate "More data" row to open
+        if (matchMedia('(max-width: 959px), (max-height: 480px)').matches) this.moreBox.open = on;
+      }
     });
   }
 
@@ -77,7 +82,7 @@ export class InfoPanel {
     if (d.parent === 'Sun') rows.push(['From the Sun', fmtDist(len(b.pos))]);
     else if (d.parent) rows.push(['From ' + d.parent, fmtDist(len(b.rel.pos))]);
     if (name !== 'Earth') {
-      if (d.parent !== 'Earth') rows.push(['From Earth', fmtDist(toEarth)]);
+      if (d.parent !== 'Earth') rows.push(['From Earth', fmtDist(toEarth), true]);
       rows.push(['Light time', fmtLight(toEarth).replace(' at light speed', '') + ' from Earth', true]);
     }
     if (d.parent) {
@@ -87,12 +92,12 @@ export class InfoPanel {
     rows.push(['Radius', Math.round(R).toLocaleString('en-US') + ' km' + (name !== 'Earth' ? '  (' + fmtRatio(R / meanRadius(EARTH)) + ' Earth)' : '')]);
     rows.push(['Mass', fmtMass(d.massKg) + (name !== 'Earth' ? '  (' + fmtRatio(d.massKg / EARTH.massKg) + ' Earth)' : ''), true]);
     if (d.periodD) rows.push(['Orbit takes', fmtPeriod(d.periodD)]);
-    if (d.synchronous) rows.push(['Rotation', 'always shows ' + d.parent + ' the same face']);
+    if (d.synchronous) rows.push(['Rotation', 'always shows ' + d.parent + ' the same face', true]);
     else if (d.rotationH) {
-      rows.push(['Spins once in', fmtHours(d.rotationH) + (d.rotationH < 0 ? ', backwards' : '') + (d.rotationNote ? ' (' + d.rotationNote + ')' : '')]);
+      rows.push(['Spins once in', fmtHours(d.rotationH) + (d.rotationH < 0 ? ', backwards' : '') + (d.rotationNote ? ' (' + d.rotationNote + ')' : ''), true]);
       // the Sun turns more slowly toward its poles
-      if (d.polarRotationD) rows.push(['At the poles', '~' + d.polarRotationD + ' days']);
-      if (d.solarDayH) rows.push(['Noon to noon', fmtHours(d.solarDayH)]);
+      if (d.polarRotationD) rows.push(['At the poles', '~' + d.polarRotationD + ' days', true]);
+      if (d.solarDayH) rows.push(['Noon to noon', fmtHours(d.solarDayH), true]);
     }
     if (d.obliquity !== undefined) rows.push(['Axial tilt', d.obliquity.toFixed(2) + '°', true]);
     if (d.synodicD) rows.push(['Lunar month', d.synodicD.toFixed(3) + ' days (new moon to new moon)', true]);
@@ -101,9 +106,9 @@ export class InfoPanel {
     if (ENGINE_BODIES.has(name) && name !== 'Sun') {
       try {
         const il = A.Illumination(A.Body[name], snap.time);
-        rows.push(['Brightness', 'magnitude ' + il.mag.toFixed(2) + ' from Earth']);
+        rows.push(['Brightness', 'magnitude ' + il.mag.toFixed(2) + ' from Earth', true]);
         if (name !== 'Moon') rows.push(['Elongation', A.AngleFromSun(A.Body[name], snap.time).toFixed(1) + '° from the Sun', true]);
-        rows.push(['Phase', (il.phase_fraction * 100).toFixed(1) + '% lit, seen from Earth', name !== 'Moon']);
+        rows.push(['Phase', (il.phase_fraction * 100).toFixed(1) + '% lit, seen from Earth', true]);
       } catch (e) { /* engine cannot do this body */ }
     }
     if (ENGINE_BODIES.has(name) || name === 'Earth') {
