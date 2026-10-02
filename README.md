@@ -72,7 +72,9 @@ GitHub Pages serves the repository as-is.
   body's moons (the inner planets for the Sun), so Earth's close look goes on to Jupiter's moons;
   farther out, from the whole system, it keeps its zoom, but no nearer than that view. Coming from
   one of its own moons (for the Sun: from an inner planet or its moon), it keeps the zoom instead,
-  but no nearer than its close look, so a close look of Io goes to a close look of Jupiter. Selecting a
+  but no nearer than its close look, so a close look of Io goes to a close look of Jupiter; from
+  one of the old body's views it arrives at the same view of the new one (an inner planet's inner
+  planets, framed around it and so wider, at the Sun's inner planets). Selecting a
   moon or an inner planet always glides over at the same zoom, no nearer than its close look (a
   moon, Mercury, Venus) or its moons (Earth, Mars). Selecting a body again, once it is centred,
   flies to the next of its views nearer than the camera is: whole system → moons (inner planets for

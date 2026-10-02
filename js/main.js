@@ -211,6 +211,8 @@ function applyShift(dt) {
 //    Farther out (the whole system, or zoomed out by hand) it keeps its distance. Coming from its
 //    own moons (or for the Sun, from the inner planets and their moons, see homeOf), it keeps the
 //    zoom instead, but no nearer than its close look: a close look of Io goes to one of Jupiter.
+//    From one of the old body's preset views it goes to the same view of the new one (samePreset):
+//    Earth's inner planets to the Sun's.
 //  - a moon or an inner planet: glide over at the same zoom, but no nearer than its entry view (a
 //    moon's close look; Mars's moons from a close look of Phobos), as these are mostly chosen where
 //    they can be seen, among their planet's moons or the inner planets; choosing it again brings it
@@ -236,7 +238,9 @@ function select(name, fly) {
     const entry = near[near.length - 1][1];
     const slide = INNER.has(name) || (BY_NAME[name].parent !== 'Sun' && name !== 'Sun');
     if (view.focus !== name) {
-      if (!homeOf(view.focus, name) && (d < entry || (!slide && d <= reachDistance(view.focus) * 1.1))) view.setFocus(name, disp, { toDist: entry });
+      const home = homeOf(view.focus, name), same = home && samePreset(view.focus, name, d);
+      if (same) view.setFocus(name, disp, { toDist: same[1] });
+      else if (!home && (d < entry || (!slide && d <= reachDistance(view.focus) * 1.1))) view.setFocus(name, disp, { toDist: entry });
       else view.setFocus(name, disp, { minDist: close, safeDist: close });
     } else if (!view.centred()) view.setFocus(name, disp, { minDist: close, safeDist: close });
     else {
@@ -254,6 +258,14 @@ function homeOf(name, home) {
   if (name === 'Sun') return false;
   const p = BY_NAME[name].parent;
   return p === home || (home === 'Sun' && (INNER.has(name) || INNER.has(p)));
+}
+// The preset of `to` of the kind the camera is in (within 10%) around `from`, if `to` has one. The
+// inner planets around Earth are framed half as far again as around the Sun (innerDistance), so
+// keeping that zoom going to the Sun left the camera short of its inner planets, and choosing the
+// Sun again went there instead of on to its close look.
+function samePreset(from, to, d) {
+  const p = presets(from, true).find(p => p[0] !== 'close' && Math.abs(Math.log(p[1] / d)) < Math.log(1.1));
+  return p ? presets(to).find(q => q[0] === p[0]) : null;
 }
 // the camera's distance from the focus where it is heading: the end of a flight, or of a wheel zoom
 const aimedDistance = () => view.tween ? view.tween.toDist : view.distance() * Math.exp(view.zoomLeft);
