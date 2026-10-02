@@ -4,7 +4,7 @@ import { snapshot, AU_KM } from './astro/ephemeris.js';
 import { EventTimeline, eventService } from './astro/events.js';
 import { BODIES, BY_NAME, meanRadius } from './data/bodies.js';
 import { DisplayScale, toScene } from './scene/scale.js';
-import { BodyViews } from './scene/bodies.js';
+import { BodyViews, HIRES_PX } from './scene/bodies.js';
 import { Orbits } from './scene/orbits.js';
 import { Stars } from './scene/stars.js';
 import { View } from './scene/view.js';
@@ -539,8 +539,10 @@ function frame(now) {
 
   bodies.setMonth(new Date(state.simMs).getUTCMonth() + 1);   // Earth's seasonal maps
   bodies.loadVisible(camera, H);
+  // and the focus body's maps for where the camera is heading (a flight, a wheel zoom), on the way
+  bodies.prefetch(view.focus, aimedDistance(), camera, H);
   // swap in a body's high-resolution map (tex.hires) once it fills the screen
-  for (const s of screenPos) if (s.onScreen && s.rpx > 350) bodies.upgrade(s.name);
+  for (const s of screenPos) if (s.onScreen && s.rpx > HIRES_PX) bodies.upgrade(s.name);
 
   const sunV = bodies.views.Sun;
   if (state.show.glare) glare.update(camera, sunV.group.position, sunV.R, W, H, renderer.getPixelRatio(),

@@ -145,8 +145,9 @@ js/ui/          info.js: information panel; hud.js: hiding the interface, tellin
 js/main.js      state, main loop, controls
 vendor/         three.js r186 (+ OrbitControls) and astronomy-engine 2.1.19, minified ES modules
 data/stars.bin  9,096 BSC5 stars: RA, Dec, V, B−V, proper motion (int16 each)
-textures/       maps, 2048 × 1024 unless noted; *_4k.jpg are 4096 × 2048, loaded once the body fills
-                the screen; earth_MM*.jpg one per month; milky_way.jpg is 4096 × 2048, in J2000 RA/Dec
+textures/       maps, 2048 × 1024 unless noted, loaded once a body is a few pixels across or the camera
+                is on its way to it; *_4k.jpg are 4096 × 2048, for a body that fills the screen;
+                earth_MM*.jpg one per month; milky_way.jpg is 4096 × 2048, in J2000 RA/Dec
 tests/          accuracy checks against JPL Horizons and NASA's eclipse canon
 ```
 

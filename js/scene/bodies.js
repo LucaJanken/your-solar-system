@@ -9,6 +9,16 @@ const C_KMS = 299792.458;
 // a map file name with {MM} comes in twelve monthly versions (Earth's seasons), chosen by the date
 const isMonthly = f => typeof f === 'string' && f.includes('{MM}');
 const MONTH_SWITCH_MS = 1000;   // while time runs fast, swap the monthly maps at most this often
+/** a body drawn with a radius of this many pixels gets its high-resolution map (tex.hires) */
+export const HIRES_PX = 350;
+// Maps are decoded off the main thread (createImageBitmap). An <img> (TextureLoader) is decoded
+// at its first upload to the GPU, inside a frame: tens of ms for a 4096×2048 map, a visible hitch.
+// Safari before 17 and Firefox before 98 mishandle the options, so they keep the <img>, the same
+// rule three's GLTFLoader uses.
+const UA = typeof navigator === 'undefined' ? '' : navigator.userAgent;
+const SAFARI = /^((?!chrome|android).)*safari/i.test(UA) ? +(UA.match(/Version\/(\d+)/) || [0, 0])[1] : Infinity;
+const FIREFOX = UA.includes('Firefox') ? +(UA.match(/Firefox\/(\d+)/) || [0, 0])[1] : Infinity;
+const BITMAPS = typeof createImageBitmap === 'function' && SAFARI >= 17 && FIREFOX >= 98;
 
 const _m = new THREE.Matrix4(), _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3();
 
@@ -75,6 +85,7 @@ function ringGeometry(inner, outer) {
 export class BodyViews {
   constructor(scene, renderer, shared) {
     this.scene = scene;
+    this.renderer = renderer;
     this.loader = new THREE.TextureLoader();
     this.aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     this.shared = shared;   // { nightOn: {value}, bright: {value} }
@@ -86,17 +97,44 @@ export class BodyViews {
     this.axis = spinAxis();
     scene.add(this.axis);
     this.axisOf = null;
+    // the decoded images are freed once on the GPU (tex), so after a lost context the maps are
+    // fetched again
+    renderer.domElement.addEventListener('webglcontextrestored', () => {
+      for (const v of Object.values(this.views)) if (v.def.tex && v.u && !v.pending) this.loadMaps(v);
+    });
   }
 
   /** draw the rotation axis of this body (null: none) */
   setAxis(name) { this.axisOf = name; }
 
+  // Loads a map and hands it to onLoad, which returns false if it no longer wants it. A kept map
+  // is uploaded to the GPU right away, so the frame that first draws it does not stall on that.
   tex(file, color = true, onLoad) {
-    const t = this.loader.load(TEX_DIR + file.replace('{MM}', String(this.month || 1).padStart(2, '0')), onLoad);
-    t.anisotropy = this.aniso;
-    t.wrapS = THREE.RepeatWrapping;   // longitude wraps (the rotation blur samples across the seam)
-    if (color) t.colorSpace = THREE.SRGBColorSpace;
-    return t;
+    const url = TEX_DIR + file.replace('{MM}', String(this.month || 1).padStart(2, '0'));
+    const done = t => {
+      t.anisotropy = this.aniso;
+      t.wrapS = THREE.RepeatWrapping;   // longitude wraps (the rotation blur samples across the seam)
+      if (color) t.colorSpace = THREE.SRGBColorSpace;
+      if (onLoad(t) === false) return t.dispose();
+      this.renderer.initTexture(t);
+      // once uploaded the decoded image is not needed (a 4096×2048 one is 32 MB)
+      if (t.image.close) t.image.close();
+      this.onChange();   // the loop may be idle (paused): draw the new map
+    };
+    if (!BITMAPS) return void this.loader.load(url, done);
+    fetch(url)
+      .then(r => { if (!r.ok) throw new Error(`${r.status} ${url}`); return r.blob(); })
+      // colour maps get the browser's colour management (some carry an ICC profile), as an <img>
+      // would; data maps (roughness, cloud opacity) are taken as stored
+      .then(b => createImageBitmap(b, { imageOrientation: 'flipY', premultiplyAlpha: 'none', colorSpaceConversion: color ? 'default' : 'none' }))
+      .then(img => {
+        const t = new THREE.Texture(img);
+        t.flipY = false;   // flipped while decoding: WebGL does not flip an ImageBitmap
+        t.addEventListener('dispose', () => img.close());
+        t.needsUpdate = true;
+        done(t);
+      })
+      .catch(e => console.warn('Map not loaded:', e.message));
   }
 
   create(def) {
@@ -104,7 +142,7 @@ export class BodyViews {
     group.add(orient);
     this.scene.add(group);
     const v = { def, group, orient, Rmean: meanRadius(def), k: 1, u: null, rings: null,
-      monthly: Object.values(def.tex || {}).some(isMonthly), mapGen: 0, roughGen: 0 };
+      monthly: Object.values(def.tex || {}).some(isMonthly), mapGen: 0, mapShown: 0, roughGen: 0 };
     const seg = def.name === 'Sun' || def.parent === 'Sun' ? [96, 64] : [64, 40];
 
     if (def.name === 'Sun') {
@@ -175,6 +213,19 @@ export class BodyViews {
     }
   }
 
+  /**
+   * Start loading what a body will need once the camera is `dist` from it: on the way there (a
+   * flight takes 1–1.5 s), rather than when it is already on screen, which left a body plain or
+   * at low resolution for the time its maps took to arrive.
+   */
+  prefetch(name, dist, camera, H) {
+    const v = this.views[name];
+    if (!v.R || !v.def.tex) return;
+    const rpx = v.R / Math.max(dist, 1e-12) * (H / 2) / Math.tan(camera.fov * Math.PI / 360);
+    if (rpx > 3 && v.pending) this.loadMaps(v);   // the normal map first: it arrives sooner
+    if (rpx > HIRES_PX) this.upgrade(name);
+  }
+
   loadMaps(v) {
     v.pending = false;
     const t = v.def.tex;
@@ -187,11 +238,12 @@ export class BodyViews {
   }
 
   // The colour map. A month change or the high-resolution swap can overtake a load still in
-  // flight, so only the newest request is kept.
+  // flight: an older map is still shown until the newer one arrives, but never replaces it.
   setMap(v, file) {
     const gen = ++v.mapGen, mat = v.mesh.material;
     this.tex(file, true, tx => {
-      if (gen !== v.mapGen) return tx.dispose();
+      if (gen < v.mapShown) return false;
+      v.mapShown = gen;
       const old = mat.map;
       mat.map = tx; mat.color.set(v.def.tex.tint || 0xffffff); mat.needsUpdate = true;
       if (old) old.dispose();
@@ -205,7 +257,7 @@ export class BodyViews {
   setRough(v) {
     const gen = ++v.roughGen, mat = v.mesh.material;
     this.tex(v.def.tex.rough, false, tx => {
-      if (gen !== v.roughGen) return tx.dispose();
+      if (gen !== v.roughGen) return false;
       const old = mat.roughnessMap;
       mat.roughnessMap = tx; mat.roughness = 1.6; mat.needsUpdate = true;
       if (old) old.dispose();
