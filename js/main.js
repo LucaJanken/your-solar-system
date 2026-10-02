@@ -74,7 +74,7 @@ const view = new View(camera, renderer.domElement);
 const info = new InfoPanel();
 // The info card and the information panel are the two ways to read about a body, chosen under Body
 // info in the settings (state.info), which can also have neither. With the card, the panel is not
-// shown until the card's More data opens it (as it looks on its own), and its – button then closes
+// shown until a click on the card (its More data) opens it (as it looks on its own), and its – button then closes
 // it, back to the card (dataOpen). Closed, the card stays away until a body is chosen (again).
 let cardDismissed = null, dataOpen = false;
 const card = new InfoCard($('card'), {
@@ -492,7 +492,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const elapsed = (now - last) / 1000, dt = Math.min(0.1, elapsed);
   last = now;
-  const active = state.playing || view.tween || view.zoomLeft || scaleAnim || nightAnim || now < wakeUntil || shift.x !== shiftTo.x || shift.y !== shiftTo.y;
+  const active = state.playing || view.tween || view.zoomLeft || scaleAnim || nightAnim || now < wakeUntil || shift.x !== shiftTo.x || shift.y !== shiftTo.y || sway.moving;
   if (!active) {
     if (hudDirty) { lastHud = now; hudDirty = false; updateHud(); }
     return;
@@ -557,7 +557,7 @@ function frame(now) {
     measureFree();
     cardPlan = planCard();
   }
-  const cardBox = placeCard(cardK, W, H);
+  const cardBox = placeCard(cardK, W, H, dt);
   const entries = BODIES.map((def, i) => {
     const v = bodies.views[def.name];
     const isMoon = def.parent && def.parent !== 'Sun';
@@ -725,16 +725,53 @@ function planCard() {
 // size as planned for the close look, scaled about the body's centre by how much larger or smaller
 // the body is drawn than there (so it neither turns with the view nor slides along the body as the
 // camera comes nearer), and fades it to `alpha`; returns its box for the labels to avoid.
+// Turning the view, the card lags behind the camera: it drifts a little the way the view is dragged, as
+// if it floated just in front of the body (whose near side moves that way while the stars behind wheel
+// the other way), and swings back when the turn stops (cardSway), its tail still on the body.
 const _cardP = new THREE.Vector3();
-function placeCard(alpha, W, H) {
+function placeCard(alpha, W, H, dt) {
   const v = bodies.views[state.selected], p = _cardP.copy(v.group.position).project(camera);
-  if (!cardPlan || alpha <= 0 || p.z >= 1) { card.set(0, 0, 0); return null; }
+  if (!cardPlan || alpha <= 0 || p.z >= 1) { card.set(0, 0, 0); sway.reset(); return null; }
   const x = (p.x * 0.5 + 0.5) * W, y = (-p.y * 0.5 + 0.5) * H;
   const r = frameExtent(state.selected) / camera.position.distanceTo(v.group.position) * (H / 2) / Math.tan(camera.fov * Math.PI / 360);
   const { kind, ox, oy } = cardPlan, k = r / cardPlan.r, w = cardPlan.w * k, h = cardPlan.h * k;
-  const l = x + ox * k, t = y + oy * k;
-  card.set(l, t, alpha, kind === 'above' ? 'down' : 'left', x, y, k);
+  const [sx, sy, tilt] = cardSway(x + (ox + cardPlan.w / 2) * k, y + (oy + cardPlan.h / 2) * k, W, H, dt, k);
+  const l = x + ox * k + sx, t = y + oy * k + sy;
+  card.set(l, t, alpha, kind === 'above' ? 'down' : 'left', x, y, k, tilt);
   return alpha > 0.3 ? { left: l - 4, right: l + w + 4, top: t - 4, bottom: t + h + 4 } : null;
+}
+// The card's swing: a damped spring (SWAY_HZ, SWAY_DAMP: one small overshoot, settled in about half a
+// second) pulling its offset toward the stars' velocity on screen behind its middle (px/s) times
+// -SWAY_LAG (the drag's way, opposite the stars'), eased off toward SWAY_MAX px at the
+// card's planned size so a fast flick does not throw it off the body. The velocity is that of the
+// camera's turn alone, from its orientation now and a frame ago (through the projection with its view
+// offset, so the view moving aside for the card does not count, nor does the camera following the
+// body while time runs, which only moves it). The card also tilts toward its offset, up to SWAY_TILT
+// degrees, about its tail's tip (card.js). Not with reduced motion.
+const SWAY_HZ = 2.2, SWAY_DAMP = 0.45, SWAY_LAG = 0.06, SWAY_MAX = 26, SWAY_TILT = 9;
+const sway = {
+  o: [0, 0], v: [0, 0], q: new THREE.Quaternion(), has: false, moving: false,
+  reset() { this.o = [0, 0]; this.v = [0, 0]; this.has = false; this.moving = false; },
+};
+const _swayD = new THREE.Vector3(), _swayQ = new THREE.Quaternion();
+function cardSway(cx, cy, W, H, dt, k) {
+  const q = camera.quaternion;
+  if (REDUCED_MOTION || !sway.has || dt <= 0) { sway.q.copy(q); sway.has = true; return [0, 0, [0, 0]]; }
+  // the direction through the card's middle as the camera pointed a frame ago, where it is on screen now
+  const d = _swayD.set(cx / W * 2 - 1, 1 - cy / H * 2, 0.5).applyMatrix4(camera.projectionMatrixInverse);
+  d.applyQuaternion(sway.q).applyQuaternion(_swayQ.copy(q).invert()).applyMatrix4(camera.projectionMatrix);
+  sway.q.copy(q);
+  const M = SWAY_MAX * k, ux = ((d.x + 1) / 2 * W - cx) / dt, uy = ((1 - d.y) / 2 * H - cy) / dt;
+  const u = Math.hypot(ux, uy) * SWAY_LAG, ease = u > 1e-9 && d.z < 1 ? M * Math.tanh(u / M) / u * SWAY_LAG : 0;
+  const w = 2 * Math.PI * SWAY_HZ, o = sway.o, v = sway.v, target = [-ux * ease, -uy * ease];
+  // (semi-implicit Euler in steps of at most 1/120 s, stable for this spring)
+  for (let n = Math.ceil(dt * 120), h = dt / n; n > 0; n--) for (let i = 0; i < 2; i++) {
+    v[i] += (w * w * (target[i] - o[i]) - 2 * SWAY_DAMP * w * v[i]) * h;
+    o[i] += v[i] * h;
+  }
+  sway.moving = Math.hypot(...o) > 0.05 || Math.hypot(...v) > 0.5 || Math.hypot(...target) > 0.05;
+  if (!sway.moving) { sway.o = [0, 0]; sway.v = [0, 0]; return [0, 0, [0, 0]]; }
+  return [o[0], o[1], [-o[1] / M * SWAY_TILT, o[0] / M * SWAY_TILT]];
 }
 
 // ---------------------------------------------------------------- picking and hover

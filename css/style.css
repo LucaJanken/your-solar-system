@@ -178,8 +178,8 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
 .info-min::after { left: 11px; top: 6px; width: 1px; height: 11px; }
 .info-min[aria-expanded="true"]::after { display: none; }
 @media (hover: hover) { .info-min:hover { border-color: var(--line-strong); } }
-/* folded down to the heading; tapping anywhere on it opens it again */
-.info.min { cursor: pointer; }
+/* folded down to the heading, tapping anywhere on it opens it again; open, it shows or hides the rest of its data */
+.info { cursor: pointer; }
 /* as tall as the time controls beside it (--ctl-h, measured in main.js), its heading centred, so the
    two bottom panels end level whatever size the buttons have */
 .info.min { display: flex; flex-direction: column; justify-content: center; min-height: var(--ctl-h, 56px); padding-top: 0; padding-bottom: 0; }
@@ -322,7 +322,7 @@ input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: none; b
    clip-path. Hidden only once it has faded out, and answering the pointer only while it can be read. ---- */
 /* (scaled about its top left corner; no will-change: transform, which kept the text a bitmap that blurred as it grew) */
 .card { position: absolute; left: 0; top: 0; z-index: 1; opacity: 0; pointer-events: none; transform-origin: 0 0; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); transition: opacity 0.35s, visibility 0s; }
-.card.on { pointer-events: auto; }
+.card.on { pointer-events: auto; cursor: pointer; }   /* a click anywhere opens More data */
 .card.off { visibility: hidden; transition: opacity 0.35s, visibility 0s 0.35s; }
 .card-shape { position: absolute; inset: 0; width: 100%; height: 100%; }
 .card-shape path { fill: var(--panel); stroke: var(--line-strong); stroke-width: 1; }

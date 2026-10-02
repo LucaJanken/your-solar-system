@@ -110,8 +110,9 @@ GitHub Pages serves the repository as-is.
   moons in the list, and they stay listed until the arrow closes them; the moons that selecting a
   body lists close again when a body of another system is selected, so going through the planets
   leaves only the current one open. The information panel starts folded down to the body's name:
-  tapping it opens it, and its – button folds it again. On phones an open panel shows the
-  description and the main figures, and tapping it shows all of its data. Panels on top of each
+  tapping it opens it, and its – button folds it again. Tapping an open panel anywhere shows the
+  rest of its data (as its More data does) and tapping it again hides it; on phones an open panel
+  shows the description and the main figures, and the tap expands it to all of its data. Panels on top of each
   other keep the gap of the screen's edge between them: the bodies panel grows (with the moons
   opened in its list) until it is that far from the panel below it (the information panel, open or
   folded, on phones; the time controls elsewhere) and then scrolls; the information panel never
@@ -124,13 +125,16 @@ GitHub Pages serves the repository as-is.
   where there is no room), its tail pointing at the body, gives its name, kind and description. It
   hangs beside the body as if in space: placed and sized for the close look, it grows and shrinks
   with the body as the camera comes nearer or goes farther, scaled about the body's centre, but
-  stays upright and facing the viewer. It shows from 0.75 to 1.35 times the close look's distance,
+  stays upright and facing the viewer. Turning the view, it lags a little behind: it drifts the way the
+  view is dragged (as if it floated just in front of the body), tilting slightly in perspective
+  about its tail's tip, and swings back with a small overshoot when the turn stops (not with
+  reduced motion). It shows from 0.75 to 1.35 times the close look's distance,
   fading out toward 0.55 and 2 (so its text stays between about half and twice its size), by the
   camera's distance as it is, so it fades in the same way during a flight as during a zoom by hand.
   The view moves aside (a view offset, already on the way there) as
   little as it takes for the body and the card to clear the screen's edges and the panels; with no
-  room anywhere there is no card. × closes it until a body is chosen again (the same one too). More
-  data opens the information panel, as it looks without the card, and its – button closes it again,
+  room anywhere there is no card. × closes it until a body is chosen again (the same one too). A
+  click anywhere else on it (its More data names this) opens the information panel, as it looks without the card, and its – button closes it again,
   back to the card. The card also stays away while a sheet is open, while the bodies panel is open
   on phones and with the interface hidden. The selected body's label gives way to it, and other
   labels keep clear of it.

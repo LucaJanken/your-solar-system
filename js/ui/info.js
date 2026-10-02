@@ -38,21 +38,19 @@ export class InfoPanel {
     this.current = null;
     this.drawn = null;   // the snapshot and body the panel shows
     // The panel starts folded down to its heading, leaving the view clear; tapping it (or +) opens
-    // it, and the minimize button folds it again. On phones an open panel is compact, and tapping it
-    // expands it.
+    // it, and the minimize button folds it again. Tapping an open panel anywhere shows the rest of
+    // its data, as its More data row does, and tapping it again hides it. On phones an open panel is
+    // compact, and showing the rest expands it (the CSS shows no More data row there).
     this.minBtn = document.getElementById('infoMin');
     this.onFold = () => {};   // folded with the – button (main.js: back to the info card)
     this.setMin(true);
+    this.moreBox.addEventListener('toggle', () => this.el.classList.toggle('expanded', this.moreBox.open));
     this.el.addEventListener('click', e => {
-      if (e.target.closest('summary')) return;
+      // (the summary toggles the data itself; nor the click that ends dragging across text to select it)
+      if (e.target.closest('summary') || !getSelection().isCollapsed) return;
       if (e.target.closest('#infoMin')) { this.setMin(!this.min); if (this.min) this.onFold(); }
       else if (this.min) this.setMin(false);
-      else {
-        const on = this.el.classList.toggle('expanded');
-        // on phones the expanded panel is the one tap: it shows the extra data too, with no
-        // separate "More data" row to open
-        if (matchMedia('(max-width: 959px), (max-height: 480px)').matches) this.moreBox.open = on;
-      }
+      else this.moreBox.open = !this.moreBox.open;
     });
   }
 
