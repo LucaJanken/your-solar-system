@@ -1290,7 +1290,6 @@ setTimeMode(timeMode);
 setNightLight(state.nightLight);
 restoreSettings();
 const fromUrl = readUrl();
-settingsRestored = true;
 refreshSnap();
 computeDisplay();
 measureFree();
@@ -1306,6 +1305,7 @@ if (fromUrl.focus) {
   if (fromUrl.fov > 0 && fromUrl.fov < 120) { camera.fov = fromUrl.fov; camera.updateProjectionMatrix(); }
 }
 paintToggles();
+settingsRestored = true;
 applyScale(scale.s);
 stars.ready.then(() => { stars.setEpoch(snap.tt / 365.25); });
 if (REDUCED_MOTION) toast('Reduced motion is on: time starts paused.');
