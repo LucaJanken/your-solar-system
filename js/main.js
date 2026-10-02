@@ -1011,7 +1011,9 @@ function placeSheet() {
   }
   if (!beside) {
     left = gap; right = app.width - gap;
-    top = Math.max(box(time).b, box($('right')).b) + gap;
+    // the out chip keeps its place when invisible, so the clock's bottom is that of its last shown part
+    const shown = [...time.children].filter(c => c.offsetParent && !c.classList.contains('off'));
+    top = Math.max(box(shown.at(-1) ?? time).b, box($('right')).b) + gap;
     bottom = Math.min(bottom, box($('info')).t - gap);
   }
   const w = Math.min(s.offsetWidth, right - left), h = Math.min(natH, bottom - top);
