@@ -12,6 +12,7 @@ import { BY_NAME } from '../data/bodies.js';
 export const TAIL = 13;   // px from the bubble's edge to the tail's tip
 const BASE = 9;           // half the width of the tail where it leaves the bubble
 const PERSPECTIVE = 2.5;  // the viewer's distance for a tilted card, in bubble widths
+const FADE_MS = 350;      // the card's fade (.card's opacity transition)
 
 export class InfoCard {
   constructor(el, { onClose, onMore }) {
@@ -22,34 +23,57 @@ export class InfoCard {
     this.name = el.querySelector('.card-name');
     this.type = el.querySelector('.card-type');
     this.desc = el.querySelector('.card-desc');
-    this.current = null;
+    this.current = null;   // the body whose text is in the card
+    this.next = null;      // the body it is about (show), and the width to set out its text at (setWidth)
+    this.width = null;
     this.alpha = -1;
+    this.hiddenAt = -Infinity;
     this.drawn = '';
+    el.addEventListener('transitionend', e => { if (e.target === el && e.propertyName === 'opacity' && this.alpha === 0) this.apply(); });
     el.querySelector('.card-close').addEventListener('click', e => { e.stopPropagation(); onClose(); });
     // (not the click that ends dragging across the text to select it)
     el.addEventListener('click', () => { if (getSelection().isCollapsed) onMore(); });
   }
 
+  // A newly chosen body's text and width wait while the card fades out where it was, so they do not
+  // appear in the previous body's card; they are put in once it is gone, or as it shows again.
   show(name) {
-    if (name === this.current) return;
+    this.next = name;
+    if (this.gone()) this.apply();
+  }
+
+  setWidth(w) {
+    this.width = w;
+    if (this.gone()) this.apply();
+  }
+
+  gone() { return this.alpha <= 0 && performance.now() - this.hiddenAt >= FADE_MS; }
+
+  apply() {
+    if (this.next !== this.current) this.fill(this.current = this.next);
+    const w = this.width ? this.width + 'px' : '';
+    if (this.body.style.width !== w) this.body.style.width = w;
+  }
+
+  fill(name) {
     const d = BY_NAME[name];
-    this.current = name;
     this.name.textContent = d.name;
     this.type.textContent = d.type;
     this.desc.textContent = d.desc;
     this.el.setAttribute('aria-label', 'About ' + d.name);
   }
 
-  /** the bubble's size (without its tail) at a given width (px), or as styled with none */
+  /** the bubble's size (without its tail) at a given width (px), or as styled with none, with the text
+   * of the body it is about (shown or still to come) */
   measure(width = null) {
-    const s = this.body.style, old = s.width;
+    const s = this.body.style, old = s.width, swap = this.next !== this.current;
+    if (swap) this.fill(this.next);
     s.width = width ? width + 'px' : '';
     const r = { w: this.body.offsetWidth, h: this.body.offsetHeight };
     s.width = old;
+    if (swap) this.fill(this.current);
     return r;
   }
-
-  setWidth(w) { this.body.style.width = w ? w + 'px' : ''; }
 
   /**
    * Places the bubble's top left corner at (x, y) (px in the view), drawn `scale` times its size, its
@@ -59,6 +83,7 @@ export class InfoCard {
    */
   set(x, y, alpha, side = 'left', px = 0, py = 0, scale = 1, tilt = [0, 0]) {
     if (alpha > 0) {
+      this.apply();
       const w = this.body.offsetWidth, h = this.body.offsetHeight, left = side === 'left';
       // the tail leaves the bubble across from the body's centre (kept off the corners) and leans toward it
       const along = (left ? py - y : px - x) / scale, len = left ? h : w;
@@ -91,6 +116,7 @@ export class InfoCard {
     const a = Math.round(alpha * 50) / 50;
     if (a === this.alpha) return;
     this.alpha = a;
+    if (a === 0) this.hiddenAt = performance.now();
     this.el.style.opacity = a;
     // only answers the pointer (and the keyboard) when it can be read
     this.el.classList.toggle('on', a > 0.5);
