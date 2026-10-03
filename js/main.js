@@ -523,6 +523,7 @@ function frame(now) {
     if (k >= 1) nightAnim = null;
   }
   computeDisplay();
+  followEarth();
   view.update(disp, drawnExtent(view.focus), maxDistance());
   paintOut();
   const cardK = cardFade();
@@ -1068,7 +1069,7 @@ function eventRow(e) {
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'ev';
   b.dataset.t = e.date.getTime();
-  const cur = e.start <= ev.at && ev.at <= e.end;
+  const cur = e.start - EV_LEAD <= ev.at && ev.at <= e.end;
   if (cur) b.setAttribute('aria-current', 'true');
   else if (e.date < ev.at) b.classList.add('past');
   const color = EV_COLOR[e.kind] || BY_NAME[e.sub].color;
@@ -1113,44 +1114,77 @@ function rebuildEvents() {
   buildEvents(row ? +row.dataset.t : ev.at);
 }
 
+// Choosing an event goes to just before it begins (EV_LEAD before first contact), paused, at a rate
+// at which it plays in about half a minute (10 min/s: 4–6 h for an eclipse or a transit), so Play
+// shows it whole. (It used to open at the peak, and Play then showed only the second half.) The
+// view is set up from the geometry at the peak.
+const EV_LEAD = 10 * 60000;
 function jumpToEvent(e) {
-  setTime(e.date.getTime(), { pause: true });
-  // a playback rate at which the event takes tens of seconds instead of passing in one frame
-  setSpeed(Math.log10({ solar: 120, lunar: 600, transit: 600 }[e.kind]));
-  state.dir = 1;
-  refreshSnap();
+  telescope = null;
   setScale(1, false);
-  computeDisplay();
   camera.fov = DEFAULT_FOV; camera.updateProjectionMatrix();
+  setTime(e.date.getTime(), { pause: true });
+  refreshSnap(); computeDisplay();
   const P = n => new THREE.Vector3(...toScene(snap.bodies[n].pos));
+  // the camera distance at which a sphere of drawn radius R spans `k` of the narrower side of the
+  // screen, and no more than 90% of the height the panels leave free (a phone held upright)
+  const W = stage.clientWidth || 1, H = stage.clientHeight || 1, tanV = Math.tan(DEFAULT_FOV * Math.PI / 360);
+  const fit = (R, k) => R / Math.sin(Math.atan(tanV * Math.min(k * Math.min(W, H), 0.9 * (free.bottom - free.top)) / H));
+  let focus, dist, dir;
   if (e.kind === 'solar') {
-    // look down on the point where the shadow axis (Sun → Moon) meets Earth
-    const earth = P('Earth'), moon = P('Moon'), ax = moon.clone().normalize();
+    // Earth's sunlit side, which the penumbra crosses from first to last contact, from between the
+    // Sun and the point where the shadow axis (Sun → Moon) meets Earth, or for a partial eclipse
+    // passes closest to it. (From that point alone, at 2.6 radii, the view showed only the middle
+    // of the eclipse, and for a partial one, whose axis misses Earth, it looked side-on at the
+    // terminator with the shadow out of sight.)
+    const earth = P('Earth'), ax = P('Moon').normalize();
     const b = ax.dot(earth), R = meanRadius(BY_NAME.Earth), disc = b * b - (earth.lengthSq() - R * R);
-    const hit = disc >= 0 ? ax.clone().multiplyScalar(b - Math.sqrt(disc)) : ax.clone().multiplyScalar(b);
-    const dir = hit.sub(earth).normalize();
-    select('Earth', false);
-    view.lock = true; paintToggles();
-    view.setFocus('Earth', disp, { dist: drawnRadius('Earth') * 2.6, dir });
+    const hit = ax.clone().multiplyScalar(disc >= 0 ? b - Math.sqrt(disc) : b);
+    dir = hit.sub(earth).normalize().add(earth.clone().negate().normalize()).normalize();
+    focus = 'Earth'; dist = fit(drawnRadius('Earth'), 0.7);
   } else if (e.kind === 'lunar') {
-    // view the Moon from the Earth side, where it is seen during the eclipse
-    const dir = P('Earth').sub(P('Moon')).normalize();
-    select('Moon', false);
+    // the Moon from the Earth side, where it is seen during the eclipse
+    dir = P('Earth').sub(P('Moon')).normalize().add(new THREE.Vector3(0, 0.25, 0)).normalize();
+    focus = 'Moon'; dist = fit(drawnRadius('Moon'), 0.5);
+  }
+  setTime(e.start - EV_LEAD);
+  // a playback rate at which the event takes tens of seconds instead of passing in one frame
+  setSpeed(Math.log10(600));
+  state.dir = 1;
+  refreshSnap(); computeDisplay();
+  if (focus) {
+    select(focus, false);
     view.lock = true; paintToggles();
-    view.setFocus('Moon', disp, { dist: drawnRadius('Moon') * 5, dir: dir.add(new THREE.Vector3(0, 0.25, 0)).normalize() });
+    view.setFocus(focus, disp, { dist, dir });
   } else {
-    // a transit: telescope view from Earth toward the Sun
-    const earth = P('Earth');
+    // a transit: a telescope at Earth aimed at the Sun, which rides along with Earth while time runs
+    // (see the frame loop), with the Sun across 80% of the narrower side of the screen
     select(e.sub, false);
     view.setFocus('Sun', disp, { dist: 1 });
     view.tween = null;
-    const k = scale.helio(earth.length()) / earth.length();
-    camera.position.copy(earth.multiplyScalar(k * 0.9995));
+    const earth = new THREE.Vector3(...disp.Earth).sub(new THREE.Vector3(...disp.Sun));
+    camera.position.copy(earth).multiplyScalar(0.9995);
     view.controls.target.set(0, 0, 0);
-    camera.fov = 1.1; camera.updateProjectionMatrix();
+    const sun = Math.atan(drawnRadius('Sun') / camera.position.length());
+    camera.fov = 2 * Math.atan(Math.tan(sun) / 0.8 * H / Math.min(W, H, free.bottom - free.top)) * 180 / Math.PI;
+    camera.updateProjectionMatrix();
+    telescope = { at: earth, s: scale.s };
     toast('Telescope view from Earth toward the Sun. Press Esc to return.');
   }
   hudDirty = true;
+}
+// The transit view's telescope: Earth's drawn place relative to the Sun when the camera was last
+// moved with it, and the display scale it was placed at. Earth covers the Sun's diameter in about
+// 13 hours, so a camera left where Earth was would see the planet cross 1.3 (Mercury) to 2.6 (Venus)
+// times too fast, and off its true chord. It ends when the view leaves the Sun or its narrow field,
+// or the scale changes.
+let telescope = null;
+function followEarth() {
+  if (!telescope) return;
+  if (view.focus !== 'Sun' || camera.fov === DEFAULT_FOV || scale.s !== telescope.s) { telescope = null; return; }
+  const at = new THREE.Vector3(...disp.Earth).sub(new THREE.Vector3(...disp.Sun));
+  camera.position.add(at.clone().sub(telescope.at));
+  telescope.at = at;
 }
 
 // ---------------------------------------------------------------- sheets, toasts, links

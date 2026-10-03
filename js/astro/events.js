@@ -19,8 +19,31 @@ function fmtDur(ms) {
   return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + ' min';
 }
 
+// The Moon's penumbra on Earth: first and last contact (P1, P4) of a solar eclipse, from the shadow
+// cone (Sun 695,700 km, Moon 1,737.4 km) and Earth as a sphere of its equatorial radius, by bisection
+// to 10 s. Within a minute of Espenak's (NASA) times for 2023–2026 (2024 Apr 8: 15:42 and 20:52
+// UT), which is plenty for where an event starts. The ±2.5 h bracket used before began up to an
+// hour before the shadow arrived, and cut the end off annular eclipses, which can last over 6 h.
+const R_SUN = 695700, R_MOON = 1737.4, R_EARTH = 6378.1366;
+function penumbraGap(ms) {
+  // > 0 while the penumbra misses Earth (km)
+  const t = A.MakeTime(new Date(ms)), m = A.GeoMoon(t), s = A.GeoVector(A.Body.Sun, t, false);
+  const M = [m.x, m.y, m.z].map(v => v * A.KM_PER_AU), S = [s.x, s.y, s.z].map(v => v * A.KM_PER_AU);
+  const a = M.map((v, i) => v - S[i]), L = Math.hypot(...a), u = a.map(v => v / L);
+  const z = -(M[0] * u[0] + M[1] * u[1] + M[2] * u[2]);   // Earth's centre beyond the Moon, along the axis
+  const p = Math.hypot(...M.map((v, i) => -v - z * u[i]));   // and off the axis
+  return p - R_EARTH - (R_MOON + z * (R_SUN + R_MOON) / L);
+}
+function penumbraContact(peak, sign) {
+  let a = peak, b = peak + sign * 3 * HOUR;
+  while (penumbraGap(b) < 0) b += sign * HOUR;
+  while (Math.abs(b - a) > 10000) { const c = (a + b) / 2; if (penumbraGap(c) < 0) a = c; else b = c; }
+  return (a + b) / 2;
+}
+
 // Each event: kind ('solar' | 'lunar' | 'transit'), sub (eclipse type, or the transiting planet),
-// date (peak), start and end (ms: while it is under way, for marking the one being shown), title
+// date (peak), start and end (ms: first and last contact, for marking the one being shown and for
+// starting there when it is chosen), title
 // and detail.
 const SEQUENCES = {
   solar: [{
@@ -33,9 +56,8 @@ const SEQUENCES = {
         // the Moon passes, north or south of the ecliptic
         detail = 'seen from high ' + (A.EclipticGeoMoon(e.peak).lat > 0 ? 'northern' : 'southern') + ' latitudes';
       } else detail = 'greatest eclipse at ' + fmtLatLon(e.latitude, e.longitude);
-      // the Moon's penumbra takes up to ~5 h to cross Earth; ±2.5 h brackets the partial phases
       const t = e.peak.date.getTime();
-      return { kind: 'solar', sub: e.kind, date: e.peak.date, start: t - 2.5 * HOUR, end: t + 2.5 * HOUR, title: KIND[e.kind] + ' solar eclipse', detail };
+      return { kind: 'solar', sub: e.kind, date: e.peak.date, start: penumbraContact(t, -1), end: penumbraContact(t, 1), title: KIND[e.kind] + ' solar eclipse', detail };
     },
   }],
   lunar: [{

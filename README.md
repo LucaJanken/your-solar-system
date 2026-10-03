@@ -71,8 +71,12 @@ GitHub Pages serves the repository as-is.
   applies it), on computers through a small popover with Set (or Enter; Esc closes it).
 - Eclipses & transits lists solar and lunar eclipses and transits of Mercury and Venus, opening at
   the displayed date and loading more as it is scrolled either way (searched in a worker). The kinds
-  shown can be switched off and on (remembered); choosing an event goes there. Times are given as
-  the clock shows them (local time, or UT in Scientific).
+  shown can be switched off and on (remembered). Choosing an event goes to just before it begins
+  (10 min before first contact), paused at 10 min/s, so that Play shows the whole of it in about
+  half a minute: a solar eclipse on Earth's sunlit side, a lunar eclipse on the Moon as seen from
+  Earth, a transit through a telescope at Earth aimed at the Sun, which moves with Earth while time
+  runs (Esc returns). A solar eclipse runs from the first to the last touch of the Moon's penumbra
+  on Earth. Times are given as the clock shows them (local time, or UT in Scientific).
 - The clock shows Local time or Scientific (UT, with TT, ΔT and the Julian Date); the
   choice is remembered (a former choice of UTC, a mode since dropped, as Scientific). An Extrapolated tag appears outside the validated 1800–2050.
 - The camera steps between a few views of the body it is centred on: its close look (a comfortable
